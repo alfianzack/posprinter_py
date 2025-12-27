@@ -552,32 +552,32 @@ namespace PosPrinterApp
                             int webViewWidth = _webView.Width;
                             int webViewHeight = _webView.Height;
                             
-                            // Inject viewport meta tag dan CSS untuk responsive
+                            // Inject viewport meta tag untuk responsive website
                             string viewportScript = $@"
                                 (function() {{
                                     // Get actual container dimensions from WebView
                                     var containerWidth = {webViewWidth};
                                     var containerHeight = {webViewHeight};
                                     
-                                    // Inject atau update viewport meta tag dengan resolusi WebView yang sebenarnya
+                                    // Inject atau update viewport meta tag - gunakan device-width untuk responsive
                                     var viewportMeta = document.querySelector(""meta[name='viewport']"");
                                     if (!viewportMeta) {{
                                         viewportMeta = document.createElement(""meta"");
                                         viewportMeta.name = ""viewport"";
                                         document.getElementsByTagName(""head"")[0].appendChild(viewportMeta);
                                     }}
-                                    // Set viewport width sesuai dengan resolusi WebView (dalam logical pixels)
-                                    viewportMeta.content = 'width=' + containerWidth + ', initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+                                    // Set viewport untuk responsive - gunakan device-width bukan fixed width
+                                    viewportMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
                                     
-                                    // Inject CSS untuk memastikan website responsive dan fit
+                                    // Inject CSS minimal untuk memastikan tidak ada overflow horizontal
                                     var style = document.createElement(""style"");
-                                    style.textContent = ""html, body {{ margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: 100% !important; overflow-x: hidden !important; overflow-y: auto !important; }} body {{ min-width: 100% !important; min-height: 100vh !important; }} * {{ box-sizing: border-box !important; }} .container, .container-fluid, main, section, article, div {{ max-width: 100% !important; width: 100% !important; }} img, video, iframe {{ max-width: 100% !important; height: auto !important; }} table {{ width: 100% !important; max-width: 100% !important; table-layout: fixed !important; }}"";
+                                    style.textContent = ""html, body {{ margin: 0 !important; padding: 0 !important; overflow-x: hidden !important; }} * {{ box-sizing: border-box !important; }}"";
                                     if (!document.getElementById(""pos-printer-style"")) {{
                                         style.id = ""pos-printer-style"";
                                         document.head.appendChild(style);
                                     }}
                                     
-                                    // Auto-fit width setelah page load dengan multiple attempts
+                                    // Auto-fit function - hanya untuk website yang TIDAK responsive
                                     function autoFit(providedWidth, providedHeight) {{
                                         // Use provided dimensions or fallback to window size
                                         var containerWidth = providedWidth || (window.innerWidth || document.documentElement.clientWidth);
@@ -587,38 +587,43 @@ namespace PosPrinterApp
                                             return;
                                         }}
                                         
+                                        // Cek apakah website sudah responsive
+                                        // Jika scrollWidth <= containerWidth + 50px (toleransi), berarti sudah responsive
+                                        var body = document.body;
+                                        var html = document.documentElement;
+                                        void body.offsetWidth; // Force reflow
+                                        
+                                        var contentWidth = Math.max(
+                                            body.scrollWidth || 0,
+                                            html.scrollWidth || 0
+                                        );
+                                        
+                                        // Jika website sudah responsive (tidak ada horizontal overflow), jangan lakukan scaling
+                                        if (contentWidth <= containerWidth + 50) {{
+                                            // Remove any existing transform
+                                            var zoomStyle = document.getElementById(""pos-printer-zoom-auto"");
+                                            if (zoomStyle) {{
+                                                zoomStyle.textContent = """";
+                                            }}
+                                            return;
+                                        }}
+                                        
+                                        // Hanya lakukan scaling jika website TIDAK responsive (ada overflow)
                                         // Remove all existing transforms first
                                         var zoomStyle = document.getElementById(""pos-printer-zoom-auto"");
                                         if (zoomStyle) {{
                                             zoomStyle.textContent = """";
                                         }}
                                         
-                                        // Force reflow untuk mendapatkan ukuran asli
-                                        var body = document.body;
-                                        var html = document.documentElement;
-                                        void body.offsetWidth;
-                                        
-                                        // Get website content width WITHOUT any transform
-                                        // Gunakan scrollWidth untuk mendapatkan width sebenarnya termasuk overflow
-                                        var contentWidth = Math.max(
-                                            body.scrollWidth || 0,
-                                            body.offsetWidth || 0,
-                                            html.scrollWidth || 0,
-                                            html.offsetWidth || 0,
-                                            body.getBoundingClientRect().width || 0,
-                                            html.getBoundingClientRect().width || 0
-                                        );
-                                        
                                         // If content width is 0, try again later
                                         if (contentWidth <= 0 || containerWidth <= 0) {{
                                             return;
                                         }}
                                         
-                                        // Calculate scale - SELALU fit ke container width
+                                        // Calculate scale - hanya scale down jika content lebih besar dari container
                                         var scale = containerWidth / contentWidth;
                                         
                                         // Jika content lebih besar dari container, scale down
-                                        // Jika content lebih kecil atau sama, tetap 1.0
                                         if (contentWidth > containerWidth) {{
                                             // Scale down untuk fit
                                             scale = Math.max(0.25, Math.min(scale, 1.0));
@@ -659,10 +664,7 @@ namespace PosPrinterApp
                                     var webViewWidth = {webViewWidth};
                                     var webViewHeight = {webViewHeight};
                                     
-                                    // Update viewport meta tag dengan ukuran WebView
-                                    if (viewportMeta) {{
-                                        viewportMeta.content = 'width=' + webViewWidth + ', initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-                                    }}
+                                    // Jangan update viewport meta tag lagi - biarkan device-width untuk responsive
                                     
                                     // Auto-fit dengan delay untuk memastikan website sudah fully loaded
                                     setTimeout(function() {{ autoFit(webViewWidth, webViewHeight); }}, 100);
@@ -677,9 +679,7 @@ namespace PosPrinterApp
                                         clearTimeout(resizeTimeout);
                                         var newWidth = window.innerWidth || document.documentElement.clientWidth;
                                         var newHeight = window.innerHeight || document.documentElement.clientHeight;
-                                        if (viewportMeta) {{
-                                            viewportMeta.content = 'width=' + newWidth + ', initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-                                        }}
+                                        // Jangan update viewport meta tag - biarkan device-width untuk responsive
                                         resizeTimeout = setTimeout(function() {{
                                             autoFit(newWidth, newHeight);
                                         }}, 300);
