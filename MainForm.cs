@@ -691,10 +691,100 @@ namespace PosPrinterApp
                             // Set zoom default setelah script injection
                             await SetZoomLevel(_currentZoomFactor);
                             
-                            // Inject JavaScript bridge
+                            // Inject JavaScript bridge dengan intercept window.print()
                             string script = @"
                                 (function() {
                                     if (window.posPrinter) return;
+                                    
+                                    // Helper function untuk extract text dari HTML element
+                                    function extractTextFromElement(element) {
+                                        if (!element) return '';
+                                        
+                                        var text = '';
+                                        var nodes = element.childNodes;
+                                        
+                                        for (var i = 0; i < nodes.length; i++) {
+                                            var node = nodes[i];
+                                            
+                                            if (node.nodeType === 3) { // Text node
+                                                text += node.textContent.trim() + '\n';
+                                            } else if (node.nodeType === 1) { // Element node
+                                                var tagName = node.tagName ? node.tagName.toLowerCase() : '';
+                                                
+                                                // Handle table rows
+                                                if (tagName === 'tr') {
+                                                    var cells = node.querySelectorAll('td, th');
+                                                    var rowText = '';
+                                                    for (var j = 0; j < cells.length; j++) {
+                                                        var cellText = cells[j].textContent.trim();
+                                                        if (cellText) {
+                                                            rowText += cellText + '  ';
+                                                        }
+                                                    }
+                                                    if (rowText) {
+                                                        text += rowText.trim() + '\n';
+                                                    }
+                                                } else {
+                                                    // Recursive untuk nested elements
+                                                    var childText = extractTextFromElement(node);
+                                                    if (childText) {
+                                                        text += childText;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        
+                                        return text;
+                                    }
+                                    
+                                    // Helper function untuk format text untuk POS printer
+                                    function formatForPosPrinter(text) {
+                                        if (!text) return '';
+                                        
+                                        // Clean up multiple newlines
+                                        text = text.replace(/\n{3,}/g, '\n\n');
+                                        
+                                        // Remove leading/trailing whitespace
+                                        text = text.trim();
+                                        
+                                        return text;
+                                    }
+                                    
+                                    // Intercept window.print() untuk redirect ke POS printer
+                                    var originalPrint = window.print;
+                                    window.print = function() {
+                                        // Cek apakah ada PrintContent element
+                                        var printContent = document.getElementById('PrintContent');
+                                        
+                                        if (printContent && window.posPrinter) {
+                                            // Extract text dari PrintContent
+                                            var text = extractTextFromElement(printContent);
+                                            text = formatForPosPrinter(text);
+                                            
+                                            if (text) {
+                                                // Print ke POS printer
+                                                window.posPrinter.print(text, true);
+                                                console.log('Print ke POS printer via intercept');
+                                                
+                                                // Cek apakah ada atribut data-auto-cash-drawer untuk auto-open cash drawer
+                                                var autoCashDrawer = printContent.getAttribute('data-auto-cash-drawer');
+                                                if (autoCashDrawer !== null && autoCashDrawer !== 'false') {
+                                                    // Parse pin dari atribut (default: 2)
+                                                    var pin = parseInt(autoCashDrawer) || 2;
+                                                    setTimeout(function() {
+                                                        window.posPrinter.openCashDrawer(pin);
+                                                    }, 500); // Delay 500ms untuk memastikan print selesai
+                                                }
+                                                
+                                                return;
+                                            }
+                                        }
+                                        
+                                        // Fallback ke original print jika tidak ada PrintContent atau posPrinter
+                                        if (originalPrint) {
+                                            originalPrint.call(window);
+                                        }
+                                    };
                                     
                                     window.posPrinter = {
                                         print: function(content, cutPaper) {
@@ -713,9 +803,29 @@ namespace PosPrinterApp
                                                 type: ""cashDrawer"",
                                                 pin: pin || null
                                             }}));
+                                        }},
+                                        // Helper function untuk extract dan print dari element
+                                        printFromElement: function(selector, cutPaper) {{
+                                            var element = typeof selector === 'string' 
+                                                ? document.querySelector(selector) 
+                                                : selector;
+                                            
+                                            if (!element) {{
+                                                console.error('POS Printer: Element not found');
+                                                return;
+                                            }}
+                                            
+                                            var text = extractTextFromElement(element);
+                                            text = formatForPosPrinter(text);
+                                            
+                                            if (text) {{
+                                                window.posPrinter.print(text, cutPaper !== false);
+                                            }} else {{
+                                                console.error('POS Printer: No text content found');
+                                            }}
                                         }}
                                     }};
-                                    console.log(""POS Printer bridge initialized"");
+                                    console.log(""POS Printer bridge initialized with window.print() intercept"");
                                 })();
                             ";
                             await _webView.CoreWebView2.ExecuteScriptAsync(script);

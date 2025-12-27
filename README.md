@@ -245,10 +245,59 @@ window.onPosPrinterResponse = function(response) {
 
 Lihat file `examples/web-integration-example.html` untuk contoh lengkap penggunaan JavaScript bridge.
 
+#### Integrasi dengan Website PHP (Yii2)
+
+Aplikasi mendukung intercept `window.print()` secara otomatis. Jika website memanggil `window.print()` dan ada elemen dengan ID `PrintContent`, kontennya akan otomatis dicetak ke POS printer.
+
+**Contoh Kode PHP:**
+```php
+$js = <<<JS
+    $(".btnprint").click(function() {
+        // Cukup panggil window.print() - akan otomatis di-intercept
+        window.print();
+        
+        setTimeout(function () {
+            window.close()
+        }, 2000);
+    });
+JS;
+$this->registerJs($js);
+```
+
+**Atau gunakan fungsi eksplisit dengan cash drawer:**
+```php
+$js = <<<JS
+    $(".btnprint").click(function() {
+        if (window.posPrinter) {
+            window.posPrinter.printFromElement('#PrintContent', true);
+            // Buka cash drawer setelah print
+            setTimeout(function() {
+                window.posPrinter.openCashDrawer(2);
+            }, 500);
+        } else {
+            // Fallback ke metode original
+            window.print();
+        }
+    });
+JS;
+$this->registerJs($js);
+```
+
+**Atau gunakan atribut data untuk auto-open cash drawer:**
+```html
+<!-- Auto-open cash drawer dengan Pin 2 setelah print -->
+<div id="PrintContent" data-auto-cash-drawer="2">
+    <!-- konten receipt -->
+</div>
+```
+
+Lihat file `examples/INTEGRASI-PHP.md` untuk panduan lengkap integrasi dengan website PHP.
+
 **Catatan:** 
 - Bridge hanya tersedia ketika website dimuat di dalam aplikasi POS Printer
 - Pastikan aplikasi sudah memilih printer yang benar sebelum menggunakan fungsi print
 - Website harus menggunakan HTTPS atau HTTP untuk keamanan
+- Aplikasi secara otomatis mengintercept `window.print()` jika ada elemen `#PrintContent`
 
 ## Catatan Teknis
 
@@ -272,7 +321,11 @@ PosPrinterApp/
 │   └── HttpServerService.cs  # HTTP server untuk API
 ├── examples/
 │   ├── test-api.html         # Contoh testing API
-│   └── web-integration-example.html  # Contoh JavaScript bridge
+│   ├── web-integration-example.html  # Contoh JavaScript bridge
+│   ├── php-receipt-example.php  # Contoh lengkap integrasi PHP
+│   ├── php-receipt-simple.php   # Contoh sederhana integrasi PHP
+│   ├── php-cashdrawer-example.php  # Contoh penggunaan cash drawer
+│   └── INTEGRASI-PHP.md      # Panduan integrasi dengan PHP
 └── PosPrinterApp.csproj      # File proyek
 ```
 
