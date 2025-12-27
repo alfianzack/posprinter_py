@@ -1,153 +1,289 @@
-# Cash Drawer Controller
+# Aplikasi POS Printer & Cash Drawer
 
-Aplikasi sederhana untuk membuka cash drawer (laci kasir) menggunakan perintah ESC/POS melalui koneksi Serial/USB, Bluetooth, atau WiFi.
+Aplikasi Windows Forms C# untuk mengontrol POS printer dan cash drawer menggunakan ESC/POS commands.
 
 ## Fitur
 
-- GUI sederhana dan mudah digunakan
-- **Dukungan penuh untuk printer Bluetooth** (akan muncul sebagai COM port virtual)
-- **Dukungan penuh untuk printer WiFi** (koneksi TCP/IP)
-- Deteksi otomatis port COM yang tersedia (USB/Serial dan Bluetooth)
-- Deteksi otomatis tipe koneksi (Bluetooth atau Serial/USB)
-- Dukungan berbagai baudrate (9600, 19200, 38400, 57600, 115200)
-- **Test Print** - Menguji printer dengan mencetak informasi koneksi dan karakter test
-- Mengirim perintah ESC/POS standar untuk membuka cash drawer
+- ✅ Print test receipt dengan format standar
+- ✅ Print teks kustom
+- ✅ Kontrol cash drawer (Pin 1 dan Pin 2)
+- ✅ Pilih printer dari daftar printer yang terinstall
+- ✅ **HTTP Server API untuk integrasi dengan server eksternal**
+- ✅ **WebView2 untuk menampilkan website dan print dari website**
+- ✅ **JavaScript Bridge untuk komunikasi antara website dan aplikasi**
+- ✅ Interface yang user-friendly dengan TabControl
 
 ## Persyaratan
 
-- Python 3.6 atau lebih baru
-- Printer POS dengan cash drawer yang terhubung via:
-  - **USB/Serial** (kabel USB atau Serial)
-  - **Bluetooth** (printer harus sudah dipasangkan dengan komputer)
-  - **WiFi** (printer harus terhubung ke jaringan WiFi yang sama dengan komputer)
+- .NET 9.0
+- Windows OS
+- **Microsoft Edge WebView2 Runtime** (akan diunduh otomatis atau download dari [Microsoft](https://developer.microsoft.com/microsoft-edge/webview2/))
+- POS Printer yang mendukung ESC/POS commands
+- Cash drawer yang terhubung ke printer
 
-## Instalasi
+## Cara Menggunakan
 
-1. Clone atau download repository ini
+1. **Build aplikasi:**
+   ```bash
+   dotnet build
+   ```
 
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+2. **Run aplikasi:**
+   ```bash
+   dotnet run
+   ```
+
+3. **Atau build executable:**
+   ```bash
+   dotnet publish -c Release -r win-x64 --self-contained
+   ```
 
 ## Penggunaan
 
-### Untuk Printer USB/Serial:
-1. Hubungkan printer POS Anda ke komputer via USB atau Serial
-2. Jalankan aplikasi (lihat langkah di bawah)
+### Aplikasi Desktop
 
-### Untuk Printer Bluetooth:
-1. **Pasangkan printer Bluetooth dengan komputer Anda terlebih dahulu:**
-   - Buka Settings > Devices > Bluetooth & other devices (Windows)
-   - Aktifkan Bluetooth jika belum aktif
-   - Tambahkan printer Bluetooth Anda
-   - Setelah dipasangkan, Windows akan membuat COM port virtual untuk printer
+#### Tab 1: Kontrol Printer
+1. **Pilih Printer:** Pilih printer POS dari dropdown
+2. **Print Test Receipt:** Klik tombol untuk mencetak struk test
+3. **Print Teks Kustom:** Masukkan teks di textbox dan klik tombol print
+4. **Buka Cash Drawer:** Klik tombol untuk membuka cash drawer (menggunakan Pin 2 secara default)
+5. **Buka dengan Pin Spesifik:** Gunakan tombol Pin 1 atau Pin 2 jika printer Anda menggunakan pin tertentu
 
-### Untuk Printer WiFi:
-1. **Pastikan printer WiFi sudah terhubung ke jaringan WiFi yang sama dengan komputer:**
-   - Konfigurasi printer WiFi melalui menu printer atau aplikasi konfigurasi
-   - Catat IP address printer (biasanya dapat dilihat dari menu printer atau aplikasi konfigurasi)
-   - Pastikan printer dan komputer berada di jaringan WiFi yang sama
+#### Tab 2: Web POS
+1. **Masukkan URL:** Masukkan URL website yang ingin ditampilkan (default: https://dxnpos-train.dxn2u.com)
+2. **Klik Go:** Untuk memuat website
+3. **Refresh:** Untuk me-reload halaman
+4. **Print dari Website:** Website dapat menggunakan JavaScript bridge untuk print dan buka cash drawer
 
-2. **Jalankan aplikasi:**
-```bash
-python cash_drawer_app.py
+### HTTP Server API
+
+1. **Start Server:** Masukkan port (default: 8080) dan klik "Start Server"
+2. **Server akan berjalan di:** `http://localhost:{port}/`
+3. **Gunakan API endpoint untuk mengirim perintah dari server eksternal**
+
+#### API Endpoints
+
+##### 1. Print Receipt
+**POST** `/api/print`
+
+Request Body:
+```json
+{
+  "content": "Teks yang ingin dicetak\nBaris kedua",
+  "cutPaper": true
+}
 ```
 
-3. **Pilih tipe koneksi:**
-   - Pilih **"Serial"** untuk USB/Serial atau Bluetooth
-   - Pilih **"WiFi"** untuk printer WiFi
+Response:
+```json
+{
+  "success": true,
+  "message": "Print berhasil"
+}
+```
 
-4. **Konfigurasi sesuai tipe koneksi:**
+Contoh menggunakan cURL:
+```bash
+curl -X POST http://localhost:8080/api/print \
+  -H "Content-Type: application/json" \
+  -d "{\"content\":\"Test Print\",\"cutPaper\":true}"
+```
 
-   **Untuk Serial/Bluetooth:**
-   - Pilih port COM printer Anda dari dropdown
-   - Aplikasi akan otomatis mendeteksi apakah port adalah Bluetooth atau Serial/USB
-   - Info tipe koneksi akan ditampilkan di bawah dropdown
-   - Pilih baudrate yang sesuai (default: 9600)
-   - Untuk Bluetooth, biasanya menggunakan 9600 atau 115200
+##### 2. Buka Cash Drawer
+**POST** `/api/cashdrawer`
 
-   **Untuk WiFi:**
-   - Masukkan IP address printer (contoh: 192.168.1.100)
-   - Masukkan port number (default: 9100 untuk Raw TCP/IP)
-   - Port 9100 adalah port standar untuk printer ESC/POS melalui WiFi
+Request Body:
+```json
+{
+  "pin": 2
+}
+```
+- `pin`: `null` atau tidak ada = default (Pin 2)
+- `pin`: `1` = Pin 1
+- `pin`: `2` = Pin 2
 
-5. **Gunakan fitur yang diinginkan:**
-   - **Klik "Test Print"** untuk menguji printer dan mencetak informasi koneksi
-   - **Klik "Buka Cash Drawer"** untuk membuka laci kasir
+Response:
+```json
+{
+  "success": true,
+  "message": "Cash drawer berhasil dibuka"
+}
+```
 
-6. **Cash drawer akan terbuka atau test print akan tercetak!**
+Contoh menggunakan cURL:
+```bash
+curl -X POST http://localhost:8080/api/cashdrawer \
+  -H "Content-Type: application/json" \
+  -d "{\"pin\":2}"
+```
 
-## Catatan
+##### 3. Status Server
+**GET** `/api/status`
 
-- **Untuk Printer Bluetooth:**
-  - Pastikan printer sudah dipasangkan dengan komputer sebelum menjalankan aplikasi
-  - Printer Bluetooth akan muncul sebagai COM port virtual di Windows
-  - Aplikasi akan otomatis mendeteksi dan menampilkan info jika port adalah Bluetooth
-  - Pastikan Bluetooth printer dalam jangkauan dan sudah terhubung
+Response:
+```json
+{
+  "status": "running",
+  "port": 8080,
+  "timestamp": "2024-01-01T12:00:00"
+}
+```
 
-- **Untuk Printer USB/Serial:**
-  - Pastikan printer sudah terhubung dan terdeteksi di sistem sebelum menjalankan aplikasi
-  - Pastikan driver printer sudah terinstall dengan benar
+#### Contoh Integrasi dengan JavaScript/Node.js
 
-- **Untuk Printer WiFi:**
-  - Pastikan printer dan komputer berada di jaringan WiFi yang sama
-  - IP address printer biasanya dapat ditemukan melalui:
-    - Menu printer (biasanya ada opsi "Network Status" atau "Print Network Configuration")
-    - Aplikasi konfigurasi printer dari vendor
-    - Router admin panel (lihat daftar perangkat yang terhubung)
-  - Port default adalah 9100 (Raw TCP/IP), yang merupakan standar untuk printer ESC/POS
-  - Beberapa printer mungkin menggunakan port lain (9101, 515, dll) - cek dokumentasi printer
-  - Pastikan firewall tidak memblokir koneksi ke port printer
+```javascript
+// Print receipt
+async function printReceipt(content) {
+  const response = await fetch('http://localhost:8080/api/print', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      content: content,
+      cutPaper: true
+    })
+  });
+  return await response.json();
+}
 
-- **Umum:**
-  - Jika port COM tidak muncul, klik tombol "Refresh"
-  - Baudrate default adalah 9600, tetapi beberapa printer mungkin menggunakan baudrate yang berbeda
-  - Perintah yang dikirim menggunakan format ESC/POS standar: `ESC p 1 0 1`
+// Buka cash drawer
+async function openCashDrawer(pin = 2) {
+  const response = await fetch('http://localhost:8080/api/cashdrawer', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ pin: pin })
+  });
+  return await response.json();
+}
+```
+
+#### Contoh Integrasi dengan PHP
+
+```php
+// Print receipt
+function printReceipt($content, $cutPaper = true) {
+    $url = 'http://localhost:8080/api/print';
+    $data = json_encode([
+        'content' => $content,
+        'cutPaper' => $cutPaper
+    ]);
+    
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    
+    $result = curl_exec($ch);
+    curl_close($ch);
+    
+    return json_decode($result, true);
+}
+
+// Buka cash drawer
+function openCashDrawer($pin = 2) {
+    $url = 'http://localhost:8080/api/cashdrawer';
+    $data = json_encode(['pin' => $pin]);
+    
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    
+    $result = curl_exec($ch);
+    curl_close($ch);
+    
+    return json_decode($result, true);
+}
+```
+
+### Integrasi dari Website (JavaScript Bridge)
+
+Aplikasi menyediakan JavaScript bridge yang dapat digunakan oleh website yang ditampilkan di WebView2. Bridge ini tersedia melalui object `window.posPrinter`.
+
+#### Cara Menggunakan di Website
+
+1. **Print Receipt:**
+```javascript
+if (window.posPrinter) {
+    window.posPrinter.print('Teks yang ingin dicetak\nBaris kedua', true);
+}
+```
+
+2. **Buka Cash Drawer:**
+```javascript
+// Default (Pin 2)
+if (window.posPrinter) {
+    window.posPrinter.openCashDrawer();
+}
+
+// Dengan pin spesifik
+if (window.posPrinter) {
+    window.posPrinter.openCashDrawer(2); // Pin 2
+    window.posPrinter.openCashDrawer(1); // Pin 1
+}
+```
+
+3. **Mendengarkan Response (Optional):**
+```javascript
+window.onPosPrinterResponse = function(response) {
+    console.log('Type:', response.type);
+    console.log('Success:', response.success);
+    console.log('Message:', response.message);
+    
+    if (response.type === 'print' && response.success) {
+        alert('Print berhasil!');
+    }
+};
+```
+
+#### Contoh Lengkap
+
+Lihat file `examples/web-integration-example.html` untuk contoh lengkap penggunaan JavaScript bridge.
+
+**Catatan:** 
+- Bridge hanya tersedia ketika website dimuat di dalam aplikasi POS Printer
+- Pastikan aplikasi sudah memilih printer yang benar sebelum menggunakan fungsi print
+- Website harus menggunakan HTTPS atau HTTP untuk keamanan
+
+## Catatan Teknis
+
+- Aplikasi menggunakan ESC/POS commands untuk komunikasi dengan printer
+- Cash drawer dibuka menggunakan command `ESC p` dengan parameter pin dan timing
+- Beberapa printer menggunakan Pin 1, beberapa menggunakan Pin 2
+- Jika cash drawer tidak terbuka, coba gunakan pin yang berbeda
+
+## Struktur Proyek
+
+```
+PosPrinterApp/
+├── Program.cs                 # Entry point aplikasi
+├── MainForm.cs               # Form utama dengan UI (TabControl)
+├── Models/
+│   └── PrintRequest.cs       # Model untuk request/response API
+├── Services/
+│   ├── PosPrinterService.cs  # Service untuk print receipt
+│   ├── CashDrawerService.cs  # Service untuk kontrol cash drawer
+│   ├── RawPrinterHelper.cs   # Helper untuk raw printing ke Windows
+│   └── HttpServerService.cs  # HTTP server untuk API
+├── examples/
+│   ├── test-api.html         # Contoh testing API
+│   └── web-integration-example.html  # Contoh JavaScript bridge
+└── PosPrinterApp.csproj      # File proyek
+```
 
 ## Troubleshooting
 
-**Test Print tidak muncul:**
-- Pastikan kertas printer sudah terpasang dengan benar
-- Cek apakah port COM yang dipilih sudah benar
-- Coba baudrate yang berbeda
-- Pastikan tidak ada aplikasi lain yang menggunakan port yang sama
-- Gunakan tombol "Test Print" untuk memverifikasi printer bekerja dengan baik sebelum membuka cash drawer
-
-**Cash drawer tidak terbuka:**
-- Pastikan kabel cash drawer terhubung dengan benar ke printer
-- Cek apakah port COM yang dipilih sudah benar
-- Coba baudrate yang berbeda
-- Pastikan tidak ada aplikasi lain yang menggunakan port yang sama
-- Gunakan "Test Print" terlebih dahulu untuk memastikan komunikasi dengan printer berjalan dengan baik
-
-**Port COM tidak muncul (Bluetooth):**
-- Pastikan printer Bluetooth sudah dipasangkan dengan komputer
-- Buka Settings > Devices > Bluetooth & other devices dan pastikan printer terhubung
-- Cek Device Manager (Windows) > Ports (COM & LPT) untuk melihat port COM virtual
-- Klik tombol "Refresh" untuk memperbarui daftar port
-- Pastikan printer Bluetooth dalam jangkauan dan tidak dalam mode sleep
-
-**Port COM tidak muncul (USB/Serial):**
-- Pastikan printer sudah terhubung ke komputer
-- Cek Device Manager (Windows) untuk melihat port COM yang tersedia
-- Klik tombol "Refresh" untuk memperbarui daftar port
-
-**Error saat membuka port (Serial/Bluetooth):**
-- Pastikan tidak ada aplikasi lain yang menggunakan port yang sama
-- Coba restart aplikasi
-- Pastikan driver printer sudah terinstall dengan benar
-
-**Error koneksi WiFi:**
-- Pastikan IP address dan port number sudah benar
-- Pastikan printer dan komputer berada di jaringan WiFi yang sama
-- Cek apakah printer WiFi aktif dan terhubung ke jaringan
-- Coba ping IP address printer dari command prompt: `ping 192.168.1.100` (ganti dengan IP printer Anda)
-- Pastikan firewall tidak memblokir koneksi ke port printer
-- Coba port lain jika port 9100 tidak bekerja (cek dokumentasi printer)
-- Pastikan tidak ada aplikasi lain yang menggunakan koneksi ke printer yang sama
-
-## Lisensi
-
-Aplikasi ini dibuat untuk keperluan internal dan dapat digunakan secara bebas.
+- **Printer tidak terdeteksi:** Pastikan printer sudah terinstall di Windows
+- **Cash drawer tidak terbuka:** Coba gunakan pin yang berbeda (Pin 1 atau Pin 2)
+- **Print gagal:** Pastikan printer mendukung ESC/POS commands dan dalam kondisi siap
+- **Server tidak bisa start:** Pastikan port tidak digunakan oleh aplikasi lain. Coba gunakan port lain (misalnya 8081, 8082)
+- **Server tidak bisa diakses dari komputer lain:** Server default hanya listen di localhost. Untuk akses dari jaringan, modifikasi kode untuk menggunakan `http://*:{port}/` atau `http://0.0.0.0:{port}/` (perlu permission administrator)
+- **WebView2 tidak bisa dimuat:** Pastikan Microsoft Edge WebView2 Runtime sudah terinstall. Download dari [Microsoft](https://developer.microsoft.com/microsoft-edge/webview2/)
+- **JavaScript bridge tidak bekerja:** Pastikan website sudah fully loaded. Bridge di-inject setelah navigation completed. Cek console browser untuk melihat apakah bridge sudah tersedia
+- **Print dari website tidak bekerja:** Pastikan printer sudah dipilih di tab "Kontrol Printer" sebelum menggunakan fungsi print dari website
 

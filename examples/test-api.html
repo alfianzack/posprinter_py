@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test POS Printer API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 10px;
+            font-family: monospace;
+        }
+        input {
+            width: 100px;
+            padding: 5px;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test POS Printer API</h1>
+    
+    <div class="section">
+        <h2>1. Print Receipt</h2>
+        <textarea id="printContent" placeholder="Masukkan teks yang ingin dicetak...">TOKO CONTOH
+Jl. Contoh No. 123
+Telp: 081234567890
+
+Tanggal: 01/01/2024 12:00:00
+---------------------------------
+Item 1              Rp 10.000
+Item 2              Rp 15.000
+---------------------------------
+Total               Rp 25.000
+
+Terima Kasih</textarea>
+        <br><br>
+        <label>
+            <input type="checkbox" id="cutPaper" checked> Cut Paper
+        </label>
+        <br><br>
+        <button onclick="printReceipt()">Print Receipt</button>
+        <div id="printResult" class="result"></div>
+    </div>
+
+    <div class="section">
+        <h2>2. Buka Cash Drawer</h2>
+        <label>Pin: 
+            <select id="drawerPin">
+                <option value="">Default (Pin 2)</option>
+                <option value="1">Pin 1</option>
+                <option value="2">Pin 2</option>
+            </select>
+        </label>
+        <br><br>
+        <button onclick="openCashDrawer()">Buka Cash Drawer</button>
+        <div id="drawerResult" class="result"></div>
+    </div>
+
+    <div class="section">
+        <h2>3. Status Server</h2>
+        <button onclick="checkStatus()">Cek Status</button>
+        <div id="statusResult" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8080';
+
+        async function printReceipt() {
+            const content = document.getElementById('printContent').value;
+            const cutPaper = document.getElementById('cutPaper').checked;
+            const resultDiv = document.getElementById('printResult');
+
+            resultDiv.textContent = 'Mengirim request...';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/print`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        content: content,
+                        cutPaper: cutPaper
+                    })
+                });
+
+                const data = await response.json();
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                resultDiv.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        async function openCashDrawer() {
+            const pinSelect = document.getElementById('drawerPin');
+            const pin = pinSelect.value === '' ? null : parseInt(pinSelect.value);
+            const resultDiv = document.getElementById('drawerResult');
+
+            resultDiv.textContent = 'Mengirim request...';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/cashdrawer`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        pin: pin
+                    })
+                });
+
+                const data = await response.json();
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                resultDiv.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        async function checkStatus() {
+            const resultDiv = document.getElementById('statusResult');
+
+            resultDiv.textContent = 'Mengirim request...';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/status`);
+                const data = await response.json();
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                resultDiv.textContent = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
+
