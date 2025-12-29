@@ -8,7 +8,7 @@ namespace PosPrinterApp.Services
     {
         private string _printerName;
 
-        public CashDrawerService(string printerName = null)
+        public CashDrawerService(string? printerName = null)
         {
             _printerName = printerName ?? GetDefaultPrinter();
         }

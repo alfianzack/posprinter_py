@@ -189,12 +189,40 @@ namespace PosPrinterApp.Services
         {
             try
             {
-                using var reader = new StreamReader(request.InputStream, request.ContentEncoding);
-                string body = await reader.ReadToEndAsync();
-
-                var printRequest = System.Text.Json.JsonSerializer.Deserialize<PrintRequest>(body);
-                if (printRequest == null || string.IsNullOrEmpty(printRequest.Content))
+                // Baca request body dengan encoding UTF-8 (default untuk JSON)
+                Encoding encoding = request.ContentEncoding ?? Encoding.UTF8;
+                if (encoding == null || encoding.CodePage == 0)
                 {
+                    encoding = Encoding.UTF8;
+                }
+                
+                using var reader = new StreamReader(request.InputStream, encoding);
+                string body = await reader.ReadToEndAsync();
+                
+                Log($"Request body: {body}");
+
+                // Configure JSON options untuk case-insensitive dan allow trailing commas
+                var jsonOptions = new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    AllowTrailingCommas = true
+                };
+
+                var printRequest = System.Text.Json.JsonSerializer.Deserialize<PrintRequest>(body, jsonOptions);
+                
+                if (printRequest == null)
+                {
+                    Log("Deserialisasi gagal - printRequest is null");
+                    return System.Text.Json.JsonSerializer.Serialize(new PrintResponse
+                    {
+                        Success = false,
+                        Message = "Format JSON tidak valid"
+                    });
+                }
+                
+                if (string.IsNullOrWhiteSpace(printRequest.Content))
+                {
+                    Log($"Content kosong atau null. Content length: {printRequest.Content?.Length ?? 0}");
                     return System.Text.Json.JsonSerializer.Serialize(new PrintResponse
                     {
                         Success = false,
@@ -202,6 +230,7 @@ namespace PosPrinterApp.Services
                     });
                 }
 
+                Log($"Printing content: {printRequest.Content.Substring(0, Math.Min(50, printRequest.Content.Length))}...");
                 bool success = _printerService.PrintCustomText(printRequest.Content, printRequest.CutPaper);
                 
                 return System.Text.Json.JsonSerializer.Serialize(new PrintResponse
@@ -210,8 +239,18 @@ namespace PosPrinterApp.Services
                     Message = success ? "Print berhasil" : "Print gagal"
                 });
             }
+            catch (System.Text.Json.JsonException jsonEx)
+            {
+                Log($"JSON parsing error: {jsonEx.Message}");
+                return System.Text.Json.JsonSerializer.Serialize(new PrintResponse
+                {
+                    Success = false,
+                    Message = $"Format JSON tidak valid: {jsonEx.Message}"
+                });
+            }
             catch (Exception ex)
             {
+                Log($"Error: {ex.Message}\nStack: {ex.StackTrace}");
                 return System.Text.Json.JsonSerializer.Serialize(new PrintResponse
                 {
                     Success = false,
@@ -224,10 +263,24 @@ namespace PosPrinterApp.Services
         {
             try
             {
-                using var reader = new StreamReader(request.InputStream, request.ContentEncoding);
+                // Baca request body dengan encoding UTF-8 (default untuk JSON)
+                Encoding encoding = request.ContentEncoding ?? Encoding.UTF8;
+                if (encoding == null || encoding.CodePage == 0)
+                {
+                    encoding = Encoding.UTF8;
+                }
+                
+                using var reader = new StreamReader(request.InputStream, encoding);
                 string body = await reader.ReadToEndAsync();
 
-                var drawerRequest = System.Text.Json.JsonSerializer.Deserialize<CashDrawerRequest>(body);
+                // Configure JSON options untuk case-insensitive
+                var jsonOptions = new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    AllowTrailingCommas = true
+                };
+
+                var drawerRequest = System.Text.Json.JsonSerializer.Deserialize<CashDrawerRequest>(body, jsonOptions);
                 
                 bool success = false;
                 if (drawerRequest?.Pin == 1)

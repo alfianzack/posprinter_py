@@ -1,17 +1,18 @@
-# Aplikasi POS Printer & Cash Drawer
+# DXN POS Printer & Cash Drawer
 
-Aplikasi Windows Forms C# untuk mengontrol POS printer dan cash drawer menggunakan ESC/POS commands.
+Aplikasi Windows Forms C# untuk mengontrol POS printer dan cash drawer menggunakan ESC/POS commands dengan branding DXN.
 
 ## Fitur
 
 - ✅ Print test receipt dengan format standar
 - ✅ Print teks kustom
+- ✅ **Logo DXN terintegrasi untuk branding**
 - ✅ Kontrol cash drawer (Pin 1 dan Pin 2)
 - ✅ Pilih printer dari daftar printer yang terinstall
 - ✅ **HTTP Server API untuk integrasi dengan server eksternal**
 - ✅ **WebView2 untuk menampilkan website dan print dari website**
 - ✅ **JavaScript Bridge untuk komunikasi antara website dan aplikasi**
-- ✅ Interface yang user-friendly dengan TabControl
+- ✅ Interface yang user-friendly dengan TabControl dan branding DXN
 
 ## Persyaratan
 
@@ -314,6 +315,10 @@ PosPrinterApp/
 ├── MainForm.cs               # Form utama dengan UI (TabControl)
 ├── Models/
 │   └── PrintRequest.cs       # Model untuk request/response API
+├── Resources/
+│   └── DxnLogo.cs            # Logo DXN untuk print receipt
+├── Resources/
+│   └── DxnLogo.cs            # Logo DXN untuk print receipt
 ├── Services/
 │   ├── PosPrinterService.cs  # Service untuk print receipt
 │   ├── CashDrawerService.cs  # Service untuk kontrol cash drawer
@@ -325,6 +330,7 @@ PosPrinterApp/
 │   ├── php-receipt-example.php  # Contoh lengkap integrasi PHP
 │   ├── php-receipt-simple.php   # Contoh sederhana integrasi PHP
 │   ├── php-cashdrawer-example.php  # Contoh penggunaan cash drawer
+│   ├── php-logo-example.php    # Contoh penggunaan logo DXN
 │   └── INTEGRASI-PHP.md      # Panduan integrasi dengan PHP
 └── PosPrinterApp.csproj      # File proyek
 ```

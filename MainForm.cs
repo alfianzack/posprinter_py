@@ -90,7 +90,22 @@ namespace PosPrinterApp
 
         private void InitializeComponent()
         {
-            this.Text = "POS Printer & Cash Drawer Control";
+            this.Text = "DXN POS";
+            
+            // Set application icon dari PNG
+            try
+            {
+                var icon = IconHelper.LoadIconFromPng("logo_pos.png");
+                if (icon != null)
+                {
+                    this.Icon = icon;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Ignore icon loading errors, use default icon
+                System.Diagnostics.Debug.WriteLine($"Error loading icon: {ex.Message}");
+            }
             
             // Calculate form size based on screen resolution (50% of screen)
             int formWidth = (int)(_screenWidth * 0.5);
@@ -133,10 +148,32 @@ namespace PosPrinterApp
 
         private void InitializePrinterTab()
         {
-            // Browser-like toolbar di atas
-            Panel toolbar = new Panel
+            // Header dengan logo DXN
+            Panel headerPanel = new Panel
             {
                 Location = new Point(0, 0),
+                Height = 60,
+                Dock = DockStyle.Top,
+                BackColor = Color.FromArgb(0, 120, 215) // DXN Blue
+            };
+            _tabPrinter.Controls.Add(headerPanel);
+            
+            // Label logo DXN
+            Label lblDxnLogo = new Label
+            {
+                Text = "DXN POS SYSTEM",
+                Location = new Point(10, 10),
+                Size = new Size(300, 40),
+                Font = new Font("Segoe UI", 16F, FontStyle.Bold),
+                ForeColor = Color.White,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            headerPanel.Controls.Add(lblDxnLogo);
+            
+            // Browser-like toolbar di bawah header
+            Panel toolbar = new Panel
+            {
+                Location = new Point(0, 60),
                 Height = 40,
                 Dock = DockStyle.Top,
                 BackColor = Color.FromArgb(240, 240, 240)
@@ -294,11 +331,11 @@ namespace PosPrinterApp
             _btnWebViewGo.Click += BtnWebViewGo_Click;
             rightPanel.Controls.Add(_btnWebViewGo);
 
-            // Label Printer (offset 40px dari atas karena ada toolbar)
+            // Label Printer (offset 100px dari atas karena ada header + toolbar)
             _lblPrinter = new Label
             {
                 Text = "Printer:",
-                Location = new Point(5, 45),
+                Location = new Point(5, 105),
                 Size = new Size(80, 20),
                 Font = new Font("Segoe UI", 9F)
             };
@@ -307,7 +344,7 @@ namespace PosPrinterApp
             // ComboBox Printer
             _printerComboBox = new ComboBox
             {
-                Location = new Point(5, 65),
+                Location = new Point(5, 125),
                 Size = new Size(300, 22),
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 9F)
@@ -319,7 +356,7 @@ namespace PosPrinterApp
             _lblCustomText = new Label
             {
                 Text = "Teks:",
-                Location = new Point(5, 92),
+                Location = new Point(5, 152),
                 Size = new Size(80, 20),
                 Font = new Font("Segoe UI", 9F)
             };
@@ -328,7 +365,7 @@ namespace PosPrinterApp
             // TextBox Custom Text
             _customTextTextBox = new TextBox
             {
-                Location = new Point(5, 112),
+                Location = new Point(5, 172),
                 Size = new Size(300, 45),
                 Multiline = true,
                 ScrollBars = ScrollBars.Vertical,
@@ -341,7 +378,7 @@ namespace PosPrinterApp
             _btnPrintTest = new Button
             {
                 Text = "Test",
-                Location = new Point(5, 164),
+                Location = new Point(5, 224),
                 Size = new Size(70, 26),
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 BackColor = Color.FromArgb(0, 120, 215),
@@ -356,7 +393,7 @@ namespace PosPrinterApp
             _btnPrintCustom = new Button
             {
                 Text = "Custom",
-                Location = new Point(80, 164),
+                Location = new Point(80, 224),
                 Size = new Size(70, 26),
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 BackColor = Color.FromArgb(0, 120, 215),
@@ -371,7 +408,7 @@ namespace PosPrinterApp
             _btnOpenDrawer = new Button
             {
                 Text = "Drawer",
-                Location = new Point(155, 164),
+                Location = new Point(155, 224),
                 Size = new Size(70, 26),
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 BackColor = Color.FromArgb(16, 124, 16),
@@ -386,7 +423,7 @@ namespace PosPrinterApp
             _btnOpenDrawerPin1 = new Button
             {
                 Text = "Pin 1",
-                Location = new Point(230, 164),
+                Location = new Point(230, 224),
                 Size = new Size(70, 26),
                 Font = new Font("Segoe UI", 8F),
                 BackColor = Color.FromArgb(16, 124, 16),
@@ -401,7 +438,7 @@ namespace PosPrinterApp
             _btnOpenDrawerPin2 = new Button
             {
                 Text = "Pin 2",
-                Location = new Point(5, 195),
+                Location = new Point(5, 255),
                 Size = new Size(70, 26),
                 Font = new Font("Segoe UI", 8F),
                 BackColor = Color.FromArgb(16, 124, 16),
@@ -416,7 +453,7 @@ namespace PosPrinterApp
             _grpServer = new GroupBox
             {
                 Text = "Server",
-                Location = new Point(5, 228),
+                Location = new Point(5, 288),
                 Size = new Size(300, 150),
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold)
             };
