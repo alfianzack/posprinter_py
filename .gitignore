@@ -176,9 +176,12 @@ $RECYCLE.BIN/
 *.runtimeconfig.json
 *.deps.json
 
+## Publish output (untuk installer)
+publish/
+dist/
+
 ## Keep image resources (uncomment if you want to ignore them)
 # image/
 
 ## Keep examples folder
 # examples/
-

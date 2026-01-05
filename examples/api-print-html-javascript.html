@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contoh Print HTML via API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .section h2 {
+            color: #007bff;
+            margin-top: 0;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            min-height: 50px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .info {
+            background-color: #e7f3ff;
+            padding: 15px;
+            border-left: 4px solid #007bff;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        label {
+            display: block;
+            margin: 10px 0 5px 0;
+            font-weight: bold;
+            color: #555;
+        }
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .checkbox-group {
+            margin: 10px 0;
+        }
+        .checkbox-group label {
+            display: inline;
+            font-weight: normal;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖨️ Contoh Print HTML Content via API</h1>
+        
+        <div class="info">
+            <strong>Info:</strong> Pastikan aplikasi DXN POS Printer sedang berjalan dan HTTP Server sudah di-start (default port: 8080)
+        </div>
+
+        <!-- Konfigurasi API -->
+        <div class="section">
+            <h2>⚙️ Konfigurasi API</h2>
+            <label for="apiUrl">API URL:</label>
+            <input type="text" id="apiUrl" value="http://localhost:8080/api/print" placeholder="http://localhost:8080/api/print">
+        </div>
+
+        <!-- Test 1: Print HTML Sederhana -->
+        <div class="section">
+            <h2>📄 Test 1: Print HTML Sederhana</h2>
+            <button onclick="testPrintSimple()">Print Receipt Sederhana</button>
+            <div id="result1" class="result"></div>
+        </div>
+
+        <!-- Test 2: Print HTML dengan Data Dinamis -->
+        <div class="section">
+            <h2>🛒 Test 2: Print dengan Data Dinamis</h2>
+            <button onclick="testPrintDynamic()">Print Receipt dengan Data Dinamis</button>
+            <div id="result2" class="result"></div>
+        </div>
+
+        <!-- Test 3: Print HTML Custom -->
+        <div class="section">
+            <h2>✏️ Test 3: Print HTML Custom</h2>
+            <label for="customHtml">HTML Content:</label>
+            <textarea id="customHtml" placeholder="Masukkan HTML content yang ingin dicetak..."><div style="text-align: center;">
+    <h2>TOKO CONTOH</h2>
+    <p>Jl. Contoh No. 123</p>
+    <p>Telp: 081234567890</p>
+    <hr>
+    <table style="width: 100%;">
+        <tr>
+            <td>Item 1</td>
+            <td style="text-align: right;">Rp 10.000</td>
+        </tr>
+        <tr>
+            <td>Item 2</td>
+            <td style="text-align: right;">Rp 15.000</td>
+        </tr>
+    </table>
+    <hr>
+    <p style="text-align: right; font-weight: bold;">Total: Rp 25.000</p>
+    <p style="text-align: center; font-weight: bold;">Terima Kasih</p>
+</div></textarea>
+            <div class="checkbox-group">
+                <input type="checkbox" id="cutPaper" checked>
+                <label for="cutPaper">Cut Paper setelah print</label>
+            </div>
+            <button onclick="testPrintCustom()">Print Custom HTML</button>
+            <div id="result3" class="result"></div>
+        </div>
+
+        <!-- Test 4: Print dan Buka Cash Drawer -->
+        <div class="section">
+            <h2>💰 Test 4: Print dan Buka Cash Drawer Sekaligus</h2>
+            <label for="drawerPin">Cash Drawer Pin:</label>
+            <select id="drawerPin" style="padding: 10px; margin: 10px 0; width: 200px;">
+                <option value="">Default (Pin 2)</option>
+                <option value="1">Pin 1</option>
+                <option value="2" selected>Pin 2</option>
+            </select>
+            <br>
+            <label for="drawerDelay">Delay sebelum buka drawer (ms):</label>
+            <input type="number" id="drawerDelay" value="500" min="0" max="5000" style="padding: 10px; margin: 10px 0; width: 200px;">
+            <br>
+            <button onclick="testPrintAndDrawer()">Print & Buka Cash Drawer</button>
+            <div id="result4" class="result"></div>
+        </div>
+
+        <!-- Test 5: Print dari PHP/Server -->
+        <div class="section">
+            <h2>🌐 Test 5: Contoh untuk Server-side (PHP/Python/Node.js)</h2>
+            <p>Lihat file <code>examples/api-print-html-php.php</code> untuk contoh PHP</p>
+            <p>Lihat file <code>examples/api-print-html-curl.sh</code> untuk contoh cURL</p>
+        </div>
+    </div>
+
+    <script>
+        // Fungsi untuk print via API
+        async function printViaApi(htmlContent, cutPaper = true) {
+            const apiUrl = document.getElementById('apiUrl').value;
+            const resultDivs = {
+                'simple': document.getElementById('result1'),
+                'dynamic': document.getElementById('result2'),
+                'custom': document.getElementById('result3')
+            };
+            
+            // Determine which result div to use
+            let resultDiv = resultDivs['custom'];
+            if (htmlContent.includes('TOKO CONTOH') && htmlContent.includes('Order No')) {
+                resultDiv = resultDivs['dynamic'];
+            } else if (htmlContent.includes('TOKO CONTOH')) {
+                resultDiv = resultDivs['simple'];
+            }
+            
+            resultDiv.textContent = 'Mengirim request ke ' + apiUrl + '...';
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        content: htmlContent,
+                        cutPaper: cutPaper
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = '<span class="success">✓ ' + data.message + '</span>';
+                } else {
+                    resultDiv.innerHTML = '<span class="error">✗ ' + data.message + '</span>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<span class="error">✗ Error: ' + error.message + '</span>';
+                console.error('Error:', error);
+            }
+        }
+
+        // Test 1: Print HTML sederhana
+        function testPrintSimple() {
+            const htmlContent = `
+<div style="text-align: center;">
+    <h2 style="font-size: 18px; font-weight: bold;">TOKO CONTOH</h2>
+    <p style="font-size: 12px;">Jl. Contoh No. 123</p>
+    <p style="font-size: 12px;">Telp: 081234567890</p>
+    <hr style="border-top: 1px solid #000; margin: 10px 0;">
+    <table style="width: 100%; font-size: 12px;">
+        <tr>
+            <td>Item 1</td>
+            <td style="text-align: right;">Rp 10.000</td>
+        </tr>
+        <tr>
+            <td>Item 2</td>
+            <td style="text-align: right;">Rp 15.000</td>
+        </tr>
+    </table>
+    <hr style="border-top: 1px solid #000; margin: 10px 0;">
+    <p style="text-align: right; font-weight: bold;">Total: Rp 25.000</p>
+    <p style="text-align: center; font-weight: bold;">Terima Kasih</p>
+</div>
+            `;
+            printViaApi(htmlContent, true);
+        }
+
+        // Test 2: Print dengan data dinamis
+        function testPrintDynamic() {
+            const orderData = {
+                order_no: 'ORD-' + new Date().toISOString().replace(/[-:]/g, '').slice(0, 15),
+                date: new Date().toLocaleString('id-ID'),
+                items: [
+                    { name: 'Produk A', qty: 2, price: 10000 },
+                    { name: 'Produk B', qty: 1, price: 15000 },
+                    { name: 'Produk C', qty: 3, price: 5000 }
+                ],
+                total: 50000
+            };
+            
+            let itemsHtml = '';
+            orderData.items.forEach(item => {
+                const subtotal = item.qty * item.price;
+                itemsHtml += `
+        <tr>
+            <td>${item.name} x${item.qty}</td>
+            <td style="text-align: right;">Rp ${subtotal.toLocaleString('id-ID')}</td>
+        </tr>
+                `;
+            });
+            
+            const htmlContent = `
+<div style="text-align: center;">
+    <h2 style="font-size: 18px; font-weight: bold;">TOKO CONTOH</h2>
+    <p style="font-size: 12px;">Jl. Contoh No. 123</p>
+    <p style="font-size: 12px;">Telp: 081234567890</p>
+    <hr style="border-top: 1px solid #000; margin: 10px 0;">
+    <p style="font-size: 12px;"><strong>Order No:</strong> ${orderData.order_no}</p>
+    <p style="font-size: 12px;"><strong>Tanggal:</strong> ${orderData.date}</p>
+    <hr style="border-top: 1px solid #000; margin: 10px 0;">
+    <table style="width: 100%; font-size: 12px;">
+        ${itemsHtml}
+    </table>
+    <hr style="border-top: 1px solid #000; margin: 10px 0;">
+    <p style="text-align: right; font-weight: bold; font-size: 14px;">Total: Rp ${orderData.total.toLocaleString('id-ID')}</p>
+    <p style="text-align: center; font-weight: bold;">Terima Kasih</p>
+    <p style="text-align: center; font-size: 10px;">Barang yang sudah dibeli tidak dapat ditukar/dikembalikan</p>
+</div>
+            `;
+            printViaApi(htmlContent, true);
+        }
+
+        // Test 3: Print custom HTML
+        function testPrintCustom() {
+            const htmlContent = document.getElementById('customHtml').value;
+            const cutPaper = document.getElementById('cutPaper').checked;
+            printViaApi(htmlContent, cutPaper);
+        }
+
+        // Test 4: Print dan buka cash drawer sekaligus
+        async function testPrintAndDrawer() {
+            const apiUrl = document.getElementById('apiUrl').value.replace('/api/print', '');
+            const resultDiv = document.getElementById('result4');
+            resultDiv.textContent = 'Mengirim request...';
+            resultDiv.className = 'result';
+            
+            const htmlContent = `
+<div style="text-align: center;">
+    <h2 style="font-size: 18px; font-weight: bold;">TOKO CONTOH</h2>
+    <p style="font-size: 12px;">Jl. Contoh No. 123</p>
+    <p style="font-size: 12px;">Telp: 081234567890</p>
+    <hr style="border-top: 1px solid #000; margin: 10px 0;">
+    <p style="font-size: 12px;"><strong>Tanggal:</strong> ${new Date().toLocaleString('id-ID')}</p>
+    <p style="font-size: 12px;"><strong>Order No:</strong> ORD-${Date.now()}</p>
+    <hr style="border-top: 1px solid #000; margin: 10px 0;">
+    <table style="width: 100%; font-size: 12px;">
+        <tr>
+            <td>Produk A x2</td>
+            <td style="text-align: right;">Rp 20.000</td>
+        </tr>
+        <tr>
+            <td>Produk B x1</td>
+            <td style="text-align: right;">Rp 15.000</td>
+        </tr>
+    </table>
+    <hr style="border-top: 1px solid #000; margin: 10px 0;">
+    <p style="text-align: right; font-weight: bold;">Total: Rp 35.000</p>
+    <p style="text-align: center; font-weight: bold;">Terima Kasih</p>
+</div>
+            `;
+            
+            const drawerPin = document.getElementById('drawerPin').value === '' ? null : parseInt(document.getElementById('drawerPin').value);
+            const drawerDelay = parseInt(document.getElementById('drawerDelay').value) || 500;
+            
+            try {
+                const data = {
+                    content: htmlContent,
+                    cutPaper: true,
+                    drawerDelay: drawerDelay
+                };
+                
+                if (drawerPin !== null) {
+                    data.drawerPin = drawerPin;
+                }
+                
+                const response = await fetch(apiUrl + '/api/print-and-drawer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    resultDiv.innerHTML = '<span class="success">✓ ' + result.message + '</span><br>' +
+                        '<span style="font-size: 12px; color: #666;">Print: ' + (result.printSuccess ? '✓ Berhasil' : '✗ Gagal') + 
+                        ' | Drawer: ' + (result.drawerSuccess ? '✓ Berhasil' : '✗ Gagal') + '</span>';
+                } else {
+                    resultDiv.innerHTML = '<span class="error">✗ ' + result.message + '</span><br>' +
+                        '<span style="font-size: 12px; color: #666;">Print: ' + (result.printSuccess ? '✓ Berhasil' : '✗ Gagal') + 
+                        ' | Drawer: ' + (result.drawerSuccess ? '✓ Berhasil' : '✗ Gagal') + '</span>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<span class="error">✗ Error: ' + error.message + '</span>';
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
+

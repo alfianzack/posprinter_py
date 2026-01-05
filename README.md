@@ -34,10 +34,16 @@ Aplikasi Windows Forms C# untuk mengontrol POS printer dan cash drawer menggunak
    dotnet run
    ```
 
-3. **Atau build executable:**
+3. **Atau build executable untuk distribusi:**
    ```bash
    dotnet publish -c Release -r win-x64 --self-contained
    ```
+   
+   **Cara menjalankan di komputer lain:**
+   - Copy seluruh folder `publish/win-x64` ke komputer target
+   - Double-click `PosPrinterApp.exe`
+   - **Tidak perlu install .NET** (sudah include)
+   - Lihat [DEPLOYMENT.md](DEPLOYMENT.md) untuk panduan lengkap
 
 ## Penggunaan
 
@@ -58,7 +64,7 @@ Aplikasi Windows Forms C# untuk mengontrol POS printer dan cash drawer menggunak
 
 ### HTTP Server API
 
-1. **Start Server:** Masukkan port (default: 8080) dan klik "Start Server"
+1. **Start Server:** Masukkan port (default: 7080) dan klik "Start Server"
 2. **Server akan berjalan di:** `http://localhost:{port}/`
 3. **Gunakan API endpoint untuk mengirim perintah dari server eksternal**
 
@@ -118,7 +124,42 @@ curl -X POST http://localhost:8080/api/cashdrawer \
   -d "{\"pin\":2}"
 ```
 
-##### 3. Status Server
+##### 3. Print dan Buka Cash Drawer Sekaligus
+**POST** `/api/print-and-drawer`
+
+Request Body:
+```json
+{
+  "content": "Teks atau HTML yang ingin dicetak",
+  "cutPaper": true,
+  "drawerPin": 2,
+  "drawerDelay": 500
+}
+```
+
+- `content` (string, required): Content yang ingin dicetak (text atau HTML)
+- `cutPaper` (boolean, optional): Apakah kertas harus dipotong setelah print. Default: `true`
+- `drawerPin` (number, optional): Pin yang digunakan untuk cash drawer (1, 2, atau null untuk default). Default: `null` (Pin 2)
+- `drawerDelay` (number, optional): Delay dalam milliseconds sebelum buka drawer. Default: `500`
+
+Response:
+```json
+{
+  "success": true,
+  "message": "Print dan buka cash drawer berhasil",
+  "printSuccess": true,
+  "drawerSuccess": true
+}
+```
+
+Contoh menggunakan cURL:
+```bash
+curl -X POST http://localhost:8080/api/print-and-drawer \
+  -H "Content-Type: application/json" \
+  -d "{\"content\":\"Test Print\",\"cutPaper\":true,\"drawerPin\":2,\"drawerDelay\":500}"
+```
+
+##### 4. Status Server
 **GET** `/api/status`
 
 Response:
@@ -156,6 +197,23 @@ async function openCashDrawer(pin = 2) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ pin: pin })
+  });
+  return await response.json();
+}
+
+// Print dan buka cash drawer sekaligus
+async function printAndOpenDrawer(content, cutPaper = true, drawerPin = 2, drawerDelay = 500) {
+  const response = await fetch('http://localhost:8080/api/print-and-drawer', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      content: content,
+      cutPaper: cutPaper,
+      drawerPin: drawerPin,
+      drawerDelay: drawerDelay
+    })
   });
   return await response.json();
 }

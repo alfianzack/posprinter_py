@@ -13,7 +13,7 @@ namespace PosPrinterApp.Services
     {
         private HttpListener? _listener;
         private bool _isRunning = false;
-        private int _port = 8080;
+        private int _port = 7080;
         private PosPrinterService _printerService;
         private CashDrawerService _cashDrawerService;
         private Action<string>? _onLog;
@@ -66,8 +66,11 @@ namespace PosPrinterApp.Services
 
                 Log($"Server HTTP berjalan di {url}");
                 Log("Endpoint tersedia:");
-                Log("  POST /api/print - Print receipt");
+                Log("  POST /api/print - Print receipt (plain text)");
+                Log("  POST /api/print-html - Print receipt (HTML format)");
+                Log("  POST /api/print-receipt - Print receipt dari data structured");
                 Log("  POST /api/cashdrawer - Buka cash drawer");
+                Log("  POST /api/print-and-drawer - Print dan buka cash drawer");
 
                 _ = Task.Run(async () => await ListenAsync());
             }
@@ -130,11 +133,13 @@ namespace PosPrinterApp.Services
 
                 Log($"{method} {path}");
 
-                // Enable CORS
-                response.AddHeader("Access-Control-Allow-Origin", "*");
-                response.AddHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-                response.AddHeader("Access-Control-Allow-Headers", "Content-Type");
+                // Enable CORS - Set headers untuk semua request
+                response.Headers.Add("Access-Control-Allow-Origin", "*");
+                response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
+                response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+                response.Headers.Add("Access-Control-Max-Age", "3600");
 
+                // Handle preflight OPTIONS request
                 if (method == "OPTIONS")
                 {
                     response.StatusCode = 200;
@@ -150,9 +155,24 @@ namespace PosPrinterApp.Services
                     responseText = await HandlePrintRequestAsync(request);
                     response.StatusCode = 200;
                 }
+                else if (path == "/api/print-html" && method == "POST")
+                {
+                    responseText = await HandlePrintHtmlRequestAsync(request);
+                    response.StatusCode = 200;
+                }
+                else if (path == "/api/print-receipt" && method == "POST")
+                {
+                    responseText = await HandlePrintReceiptDataRequestAsync(request);
+                    response.StatusCode = 200;
+                }
                 else if (path == "/api/cashdrawer" && method == "POST")
                 {
                     responseText = await HandleCashDrawerRequestAsync(request);
+                    response.StatusCode = 200;
+                }
+                else if (path == "/api/print-and-drawer" && method == "POST")
+                {
+                    responseText = await HandlePrintAndDrawerRequestAsync(request);
                     response.StatusCode = 200;
                 }
                 else if (path == "/api/status" && method == "GET")
@@ -173,6 +193,12 @@ namespace PosPrinterApp.Services
             catch (Exception ex)
             {
                 Log($"Error processing request: {ex.Message}");
+                
+                // Pastikan CORS headers juga ada di error response
+                response.Headers.Add("Access-Control-Allow-Origin", "*");
+                response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
+                response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+                
                 string errorResponse = System.Text.Json.JsonSerializer.Serialize(new { error = ex.Message });
                 byte[] buffer = Encoding.UTF8.GetBytes(errorResponse);
                 response.StatusCode = 500;
@@ -259,6 +285,155 @@ namespace PosPrinterApp.Services
             }
         }
 
+        private async Task<string> HandlePrintHtmlRequestAsync(HttpListenerRequest request)
+        {
+            try
+            {
+                // Baca request body dengan encoding UTF-8
+                Encoding encoding = request.ContentEncoding ?? Encoding.UTF8;
+                if (encoding == null || encoding.CodePage == 0)
+                {
+                    encoding = Encoding.UTF8;
+                }
+                
+                using var reader = new StreamReader(request.InputStream, encoding);
+                string body = await reader.ReadToEndAsync();
+                
+                Log($"Print HTML Request body length: {body.Length}");
+
+                // Configure JSON options untuk case-insensitive dan allow trailing commas
+                var jsonOptions = new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    AllowTrailingCommas = true
+                };
+
+                var printRequest = System.Text.Json.JsonSerializer.Deserialize<PrintHtmlRequest>(body, jsonOptions);
+                
+                if (printRequest == null)
+                {
+                    Log("Deserialisasi gagal - printRequest is null");
+                    return System.Text.Json.JsonSerializer.Serialize(new PrintHtmlResponse
+                    {
+                        Success = false,
+                        Message = "Format JSON tidak valid"
+                    });
+                }
+                
+                if (string.IsNullOrWhiteSpace(printRequest.HtmlContent))
+                {
+                    Log("HTML Content kosong atau null");
+                    return System.Text.Json.JsonSerializer.Serialize(new PrintHtmlResponse
+                    {
+                        Success = false,
+                        Message = "HTML Content tidak boleh kosong"
+                    });
+                }
+
+                Log($"Printing HTML content (length: {printRequest.HtmlContent.Length})");
+                bool success = _printerService.PrintHtml(printRequest.HtmlContent, printRequest.CutPaper);
+                
+                return System.Text.Json.JsonSerializer.Serialize(new PrintHtmlResponse
+                {
+                    Success = success,
+                    Message = success ? "Print HTML berhasil" : "Print HTML gagal"
+                });
+            }
+            catch (System.Text.Json.JsonException jsonEx)
+            {
+                Log($"JSON parsing error: {jsonEx.Message}");
+                return System.Text.Json.JsonSerializer.Serialize(new PrintHtmlResponse
+                {
+                    Success = false,
+                    Message = $"Format JSON tidak valid: {jsonEx.Message}"
+                });
+            }
+            catch (Exception ex)
+            {
+                Log($"Error: {ex.Message}\nStack: {ex.StackTrace}");
+                return System.Text.Json.JsonSerializer.Serialize(new PrintHtmlResponse
+                {
+                    Success = false,
+                    Message = $"Error: {ex.Message}"
+                });
+            }
+        }
+
+        private async Task<string> HandlePrintReceiptDataRequestAsync(HttpListenerRequest request)
+        {
+            try
+            {
+                // Baca request body dengan encoding UTF-8
+                Encoding encoding = request.ContentEncoding ?? Encoding.UTF8;
+                if (encoding == null || encoding.CodePage == 0)
+                {
+                    encoding = Encoding.UTF8;
+                }
+                
+                using var reader = new StreamReader(request.InputStream, encoding);
+                string body = await reader.ReadToEndAsync();
+                
+                Log($"Print Receipt Data Request body length: {body.Length}");
+
+                // Configure JSON options untuk case-insensitive dan allow trailing commas
+                var jsonOptions = new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    AllowTrailingCommas = true,
+                    NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString
+                };
+
+                var printRequest = System.Text.Json.JsonSerializer.Deserialize<PrintReceiptDataRequest>(body, jsonOptions);
+                
+                if (printRequest == null)
+                {
+                    Log("Deserialisasi gagal - printRequest is null");
+                    return System.Text.Json.JsonSerializer.Serialize(new PrintReceiptDataResponse
+                    {
+                        Success = false,
+                        Message = "Format JSON tidak valid"
+                    });
+                }
+                
+                if (printRequest.Company == null && printRequest.TransHead == null)
+                {
+                    Log("Data Company dan TransHead kosong");
+                    return System.Text.Json.JsonSerializer.Serialize(new PrintReceiptDataResponse
+                    {
+                        Success = false,
+                        Message = "Data tidak boleh kosong"
+                    });
+                }
+
+                Log($"Printing receipt from data (Order No: {printRequest.TransHead?.OrderNo ?? "N/A"})");
+                bool success = _printerService.PrintReceiptFromData(printRequest, printRequest.CutPaper);
+                
+                return System.Text.Json.JsonSerializer.Serialize(new PrintReceiptDataResponse
+                {
+                    Success = success,
+                    Message = success ? "Print receipt berhasil" : "Print receipt gagal"
+                });
+            }
+            catch (System.Text.Json.JsonException jsonEx)
+            {
+                Log($"JSON parsing error: {jsonEx.Message}");
+                return System.Text.Json.JsonSerializer.Serialize(new PrintReceiptDataResponse
+                {
+                    Success = false,
+                    Message = $"Format JSON tidak valid: {jsonEx.Message}"
+                });
+            }
+            catch (Exception ex)
+            {
+                Log($"Error: {ex.Message}\nStack: {ex.StackTrace}");
+                return System.Text.Json.JsonSerializer.Serialize(new PrintReceiptDataResponse
+                {
+                    Success = false,
+                    Message = $"Error: {ex.Message}"
+                });
+            }
+        }
+
         private async Task<string> HandleCashDrawerRequestAsync(HttpListenerRequest request)
         {
             try
@@ -308,6 +483,130 @@ namespace PosPrinterApp.Services
                 {
                     Success = false,
                     Message = $"Error: {ex.Message}"
+                });
+            }
+        }
+
+        private async Task<string> HandlePrintAndDrawerRequestAsync(HttpListenerRequest request)
+        {
+            try
+            {
+                // Baca request body dengan encoding UTF-8
+                Encoding encoding = request.ContentEncoding ?? Encoding.UTF8;
+                if (encoding == null || encoding.CodePage == 0)
+                {
+                    encoding = Encoding.UTF8;
+                }
+                
+                using var reader = new StreamReader(request.InputStream, encoding);
+                string body = await reader.ReadToEndAsync();
+                
+                Log($"Print and Drawer Request body: {body}");
+
+                // Configure JSON options
+                var jsonOptions = new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    AllowTrailingCommas = true
+                };
+
+                var printDrawerRequest = System.Text.Json.JsonSerializer.Deserialize<PrintAndDrawerRequest>(body, jsonOptions);
+                
+                if (printDrawerRequest == null)
+                {
+                    return System.Text.Json.JsonSerializer.Serialize(new PrintAndDrawerResponse
+                    {
+                        Success = false,
+                        Message = "Format JSON tidak valid",
+                        PrintSuccess = false,
+                        DrawerSuccess = false
+                    });
+                }
+                
+                if (string.IsNullOrWhiteSpace(printDrawerRequest.Content))
+                {
+                    return System.Text.Json.JsonSerializer.Serialize(new PrintAndDrawerResponse
+                    {
+                        Success = false,
+                        Message = "Content tidak boleh kosong",
+                        PrintSuccess = false,
+                        DrawerSuccess = false
+                    });
+                }
+
+                // Print dulu
+                Log($"Printing content: {printDrawerRequest.Content.Substring(0, Math.Min(50, printDrawerRequest.Content.Length))}...");
+                bool printSuccess = _printerService.PrintCustomText(printDrawerRequest.Content, printDrawerRequest.CutPaper);
+                
+                // Delay sebelum buka drawer (default: 500ms)
+                int delay = printDrawerRequest.DrawerDelay ?? 500;
+                if (delay > 0)
+                {
+                    await Task.Delay(delay);
+                }
+                
+                // Buka cash drawer
+                bool drawerSuccess = false;
+                if (printDrawerRequest.DrawerPin == 1)
+                {
+                    drawerSuccess = _cashDrawerService.OpenCashDrawerPin1(showMessage: false);
+                }
+                else if (printDrawerRequest.DrawerPin == 2)
+                {
+                    drawerSuccess = _cashDrawerService.OpenCashDrawerPin2(showMessage: false);
+                }
+                else
+                {
+                    drawerSuccess = _cashDrawerService.OpenCashDrawer(showMessage: false);
+                }
+                
+                bool overallSuccess = printSuccess && drawerSuccess;
+                string message = "";
+                if (overallSuccess)
+                {
+                    message = "Print dan buka cash drawer berhasil";
+                }
+                else if (printSuccess && !drawerSuccess)
+                {
+                    message = "Print berhasil, tapi cash drawer gagal dibuka";
+                }
+                else if (!printSuccess && drawerSuccess)
+                {
+                    message = "Print gagal, tapi cash drawer berhasil dibuka";
+                }
+                else
+                {
+                    message = "Print dan cash drawer gagal";
+                }
+                
+                return System.Text.Json.JsonSerializer.Serialize(new PrintAndDrawerResponse
+                {
+                    Success = overallSuccess,
+                    Message = message,
+                    PrintSuccess = printSuccess,
+                    DrawerSuccess = drawerSuccess
+                });
+            }
+            catch (System.Text.Json.JsonException jsonEx)
+            {
+                Log($"JSON parsing error: {jsonEx.Message}");
+                return System.Text.Json.JsonSerializer.Serialize(new PrintAndDrawerResponse
+                {
+                    Success = false,
+                    Message = $"Format JSON tidak valid: {jsonEx.Message}",
+                    PrintSuccess = false,
+                    DrawerSuccess = false
+                });
+            }
+            catch (Exception ex)
+            {
+                Log($"Error: {ex.Message}\nStack: {ex.StackTrace}");
+                return System.Text.Json.JsonSerializer.Serialize(new PrintAndDrawerResponse
+                {
+                    Success = false,
+                    Message = $"Error: {ex.Message}",
+                    PrintSuccess = false,
+                    DrawerSuccess = false
                 });
             }
         }

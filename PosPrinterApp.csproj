@@ -9,6 +9,15 @@
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
     <NoWarn>$(NoWarn);NU1605;MSB3277;NU1603</NoWarn>
+    
+    <!-- Informasi aplikasi untuk installer -->
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Product>DXN POS</Product>
+    <Company>DXN</Company>
+    <Copyright>Copyright (C) DXN 2024</Copyright>
+    <Description>DXN POS Application</Description>
   </PropertyGroup>
 
   <ItemGroup>

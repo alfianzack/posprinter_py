@@ -124,7 +124,9 @@ namespace PosPrinterApp
             this.FormBorderStyle = FormBorderStyle.Sizable;
             this.MaximizeBox = true;
             this.MinimumSize = new Size(600, 400);
+            this.WindowState = FormWindowState.Maximized; // Maximize saat startup
             this.FormClosing += MainForm_FormClosing;
+            this.Shown += MainForm_Shown; // Event untuk auto-fit setelah form shown
 
             // TabControl - akan mengisi seluruh form
             _tabControl = new TabControl
@@ -474,7 +476,7 @@ namespace PosPrinterApp
             {
                 Location = new Point(45, 20),
                 Size = new Size(55, 22),
-                Text = "8080",
+                Text = "7080",
                 Font = new Font("Segoe UI", 8F)
             };
             _grpServer.Controls.Add(_txtServerPort);
@@ -1257,11 +1259,70 @@ namespace PosPrinterApp
                     {
                         _printerComboBox.SelectedIndex = 0;
                     }
+                    
+                    // Auto-set printer ke service saat load
+                    if (_printerComboBox.SelectedItem != null)
+                    {
+                        string selectedPrinter = _printerComboBox.SelectedItem.ToString();
+                        _printerService.SetPrinter(selectedPrinter);
+                        _cashDrawerService.SetPrinter(selectedPrinter);
+                    }
                 }
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error memuat daftar printer: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        
+        private void MainForm_Shown(object sender, EventArgs e)
+        {
+            // Auto-fit WebView setelah form fully loaded
+            try
+            {
+                // Delay sedikit untuk memastikan WebView sudah ready
+                Task.Delay(500).ContinueWith(_ =>
+                {
+                    if (InvokeRequired)
+                    {
+                        Invoke(new Action(() => AutoFitWebView()));
+                    }
+                    else
+                    {
+                        AutoFitWebView();
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error auto-fit: {ex.Message}");
+            }
+        }
+        
+        private async void AutoFitWebView()
+        {
+            try
+            {
+                // Auto-fit to width jika WebView sudah loaded
+                if (_webView?.CoreWebView2 != null)
+                {
+                    // Reset zoom dulu menggunakan method yang sudah ada
+                    _currentZoomFactor = 1.0;
+                    await SetZoomLevel(1.0);
+                    UpdateZoomLabel();
+                    
+                    // Fit to width setelah delay untuk memastikan website sudah loaded
+                    await Task.Delay(1500);
+                    
+                    if (_webView?.CoreWebView2 != null)
+                    {
+                        BtnFitToWidth_Click(null, null);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error auto-fit WebView: {ex.Message}");
             }
         }
 
