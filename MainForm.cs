@@ -1,7 +1,9 @@
 using System;
 using System.Drawing;
 using System.Drawing.Printing;
+using System.IO;
 using System.Linq;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.WinForms;
@@ -53,6 +55,21 @@ namespace PosPrinterApp
 
         public MainForm()
         {
+            // Set working directory ke application directory untuk ensure DLLs bisa ditemukan
+            try
+            {
+                string appDir = Path.GetDirectoryName(Application.ExecutablePath);
+                if (!string.IsNullOrEmpty(appDir) && Directory.Exists(appDir))
+                {
+                    Directory.SetCurrentDirectory(appDir);
+                    System.Diagnostics.Debug.WriteLine($"Working directory set to: {appDir}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error setting working directory: {ex.Message}");
+            }
+            
             // Get screen resolution and DPI before initializing components
             GetScreenResolution();
             InitializeComponent();
@@ -551,11 +568,120 @@ namespace PosPrinterApp
             InitializeWebView2();
         }
 
+        // Helper function untuk log ke file
+        private void LogToFile(string message)
+        {
+            try
+            {
+                string logDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "DXN_POS_Printer",
+                    "Logs");
+                
+                if (!Directory.Exists(logDir))
+                {
+                    Directory.CreateDirectory(logDir);
+                }
+                
+                string logFile = Path.Combine(logDir, $"webview2_{DateTime.Now:yyyyMMdd}.log");
+                string logEntry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\r\n";
+                File.AppendAllText(logFile, logEntry);
+            }
+            catch
+            {
+                // Ignore logging errors
+            }
+        }
+
         private async void InitializeWebView2()
         {
             try
             {
-                await _webView.EnsureCoreWebView2Async(null);
+                LogToFile("=== Starting WebView2 Initialization ===");
+                
+                // Check if WebView2 Runtime is available
+                string version = null;
+                try
+                {
+                    version = Microsoft.Web.WebView2.Core.CoreWebView2Environment.GetAvailableBrowserVersionString();
+                    LogToFile($"WebView2 Runtime Version: {version}");
+                    System.Diagnostics.Debug.WriteLine($"WebView2 Runtime Version: {version}");
+                }
+                catch (Exception ex)
+                {
+                    // If GetAvailableBrowserVersionString throws, WebView2 is not installed
+                    LogToFile($"Error getting WebView2 version: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Error getting WebView2 version: {ex.Message}");
+                    version = null;
+                }
+                
+                if (string.IsNullOrEmpty(version))
+                {
+                    string errorMsg = "Microsoft Edge WebView2 Runtime tidak ditemukan.\n\n" +
+                        "Aplikasi memerlukan WebView2 Runtime untuk berjalan.\n\n" +
+                        "Silakan download dan install dari:\n" +
+                        "https://developer.microsoft.com/microsoft-edge/webview2/\n\n" +
+                        "Setelah install, restart aplikasi.";
+                    
+                    LogToFile("ERROR: WebView2 Runtime not found");
+                    MessageBox.Show(
+                        errorMsg,
+                        "WebView2 Runtime Required",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Initialize WebView2 dengan default location (biarkan WebView2 pilih sendiri)
+                // Ini biasanya lebih reliable daripada specify custom folder
+                LogToFile("Initializing WebView2 with default location...");
+                LogToFile($"WebView2 Control Handle: {_webView.Handle}");
+                LogToFile($"WebView2 Control IsDisposed: {_webView.IsDisposed}");
+                LogToFile($"Current Directory: {Directory.GetCurrentDirectory()}");
+                LogToFile($"Application Executable Path: {Application.ExecutablePath}");
+                
+                System.Diagnostics.Debug.WriteLine("Initializing WebView2 with default location...");
+                System.Diagnostics.Debug.WriteLine($"WebView2 Control Handle: {_webView.Handle}");
+                System.Diagnostics.Debug.WriteLine($"WebView2 Control IsDisposed: {_webView.IsDisposed}");
+                
+                try
+                {
+                    LogToFile("Calling EnsureCoreWebView2Async...");
+                    await _webView.EnsureCoreWebView2Async(null);
+                    LogToFile("EnsureCoreWebView2Async completed");
+                    System.Diagnostics.Debug.WriteLine("WebView2 EnsureCoreWebView2Async completed");
+                    
+                    if (_webView.CoreWebView2 == null)
+                    {
+                        string errorMsg = "CoreWebView2 is null after EnsureCoreWebView2Async";
+                        LogToFile($"ERROR: {errorMsg}");
+                        throw new Exception(errorMsg);
+                    }
+                    
+                    LogToFile($"WebView2 CoreWebView2 created: {_webView.CoreWebView2 != null}");
+                    LogToFile("WebView2 initialized successfully");
+                    System.Diagnostics.Debug.WriteLine($"WebView2 CoreWebView2 created: {_webView.CoreWebView2 != null}");
+                    System.Diagnostics.Debug.WriteLine("WebView2 initialized successfully");
+                    
+                    // Disable zoom control dan set zoom tetap berdasarkan DPI
+                    _webView.CoreWebView2.Settings.IsZoomControlEnabled = false;
+                    _webView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = false;
+                    
+                    // Set zoom factor tetap berdasarkan DPI scaling
+                    // Jika DPI scale > 1, kita perlu adjust zoom agar konten tidak terlalu kecil
+                    double baseZoom = 1.0 / Math.Max(_dpiScaleX, _dpiScaleY);
+                    _currentZoomFactor = Math.Max(0.5, Math.Min(baseZoom, 2.0)); // Batasi antara 50% - 200%
+                    
+                    LogToFile($"DPI Scale X: {_dpiScaleX}, Y: {_dpiScaleY}, Base Zoom: {baseZoom}, Final Zoom: {_currentZoomFactor}");
+                }
+                catch (Exception initEx)
+                {
+                    string errorDetails = $"Error in EnsureCoreWebView2Async: {initEx.Message}\r\nStack trace: {initEx.StackTrace}";
+                    LogToFile($"ERROR: {errorDetails}");
+                    System.Diagnostics.Debug.WriteLine($"Error in EnsureCoreWebView2Async: {initEx.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Stack trace: {initEx.StackTrace}");
+                    throw; // Re-throw untuk ditangani di catch block utama
+                }
                 
                 // Setup WebMessageReceived handler
                 _webView.CoreWebView2.WebMessageReceived += WebView_WebMessageReceived;
@@ -566,7 +692,7 @@ namespace PosPrinterApp
                     UpdateNavigationButtons();
                 };
                 
-                // Handle WebView resize untuk update viewport
+                // Handle WebView resize untuk update viewport (dengan zoom tetap)
                 _webView.SizeChanged += async (sender, e) =>
                 {
                     if (_webView?.CoreWebView2 != null)
@@ -576,7 +702,24 @@ namespace PosPrinterApp
                         int adjustedHeight = (int)(_webView.Height / _dpiScaleY);
                         
                         // Trigger auto-fit in JavaScript when WebView2 control resizes
-                        _ = _webView.CoreWebView2.ExecuteScriptAsync($"window.posPrinterAutoFit({adjustedWidth}, {adjustedHeight});");
+                        // Zoom factor tetap, hanya adjust fit
+                        _ = _webView.CoreWebView2.ExecuteScriptAsync($@"
+                            (function() {{
+                                if (window.posPrinterAutoFit) {{
+                                    window.posPrinterAutoFit({adjustedWidth}, {adjustedHeight});
+                                }}
+                                // Pastikan zoom tetap
+                                var zoomStyle = document.getElementById(""pos-printer-zoom-fixed"");
+                                if (!zoomStyle) {{
+                                    zoomStyle = document.createElement(""style"");
+                                    zoomStyle.id = ""pos-printer-zoom-fixed"";
+                                    document.head.appendChild(zoomStyle);
+                                }}
+                                var scale = {_currentZoomFactor.ToString(System.Globalization.CultureInfo.InvariantCulture)};
+                                var widthPercent = (100 / scale);
+                                zoomStyle.textContent = ""html, body {{ transform: scale("" + scale + "") !important; transform-origin: top left !important; width: "" + widthPercent + ""% !important; }} "";
+                            }})();
+                        ");
                     }
                 };
                 
@@ -681,7 +824,7 @@ namespace PosPrinterApp
                                         var heightPercent = (containerHeight / scale);
                                         
                                         // Apply transform dengan !important untuk override semua style
-                                        var cssText = ""html, body {{ transform: scale("" + scale + "") !important; transform-origin: top left !important; width: "" + widthPercent + ""% !important; min-width: "" + widthPercent + ""% !important; max-width: "" + widthPercent + ""% !important; }} html {{ height: "" + heightPercent + ""px !important; overflow-x: hidden !important; }} body {{ height: auto !important; overflow-x: hidden !important; }}"";
+                                        var cssText = ""html, body {{ transform: scale("" + scale + "") !important; transform-origin: top left !important; width: "" + widthPercent + ""% !important; }} html {{ height: "" + heightPercent + ""px !important; overflow-x: hidden !important; }} body {{ height: auto !important; overflow-x: hidden !important; }}"";
                                         zoomStyle.textContent = cssText;
                                         
                                         // Update document dimensions
@@ -727,8 +870,17 @@ namespace PosPrinterApp
                             ";
                             await _webView.CoreWebView2.ExecuteScriptAsync(viewportScript);
                             
-                            // Set zoom default setelah script injection
-                            await SetZoomLevel(_currentZoomFactor);
+                            // Set zoom tetap setelah script injection (tidak berubah-ubah)
+                            await SetFixedZoomLevel(_currentZoomFactor);
+                            
+                            // Auto-fit setelah delay untuk memastikan konten sudah loaded
+                            await Task.Delay(500);
+                            if (_webView?.CoreWebView2 != null)
+                            {
+                                int adjustedWidth = (int)(_webView.Width / _dpiScaleX);
+                                int adjustedHeight = (int)(_webView.Height / _dpiScaleY);
+                                await _webView.CoreWebView2.ExecuteScriptAsync($"if (window.posPrinterAutoFit) window.posPrinterAutoFit({adjustedWidth}, {adjustedHeight});");
+                            }
                             
                             // Inject JavaScript bridge dengan intercept window.print()
                             string script = @"
@@ -880,10 +1032,71 @@ namespace PosPrinterApp
                 // Load default URL
                 _webView.CoreWebView2.Navigate(_txtWebViewUrl.Text);
             }
+            catch (System.UnauthorizedAccessException ex)
+            {
+                string errorDetails = $"Access Denied Error: {ex.Message}\r\nStack trace: {ex.StackTrace}";
+                LogToFile($"ERROR: {errorDetails}");
+                
+                string logPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "DXN_POS_Printer",
+                    "Logs",
+                    $"webview2_{DateTime.Now:yyyyMMdd}.log");
+                
+                MessageBox.Show(
+                    $"Access Denied Error: {ex.Message}\n\n" +
+                    "Kemungkinan penyebab:\n" +
+                    "1. WebView2 Runtime tidak terinstall atau tidak dapat diakses\n" +
+                    "2. Permission tidak cukup (coba jalankan sebagai Administrator)\n" +
+                    "3. Antivirus atau security software memblokir akses\n\n" +
+                    "Solusi:\n" +
+                    "1. Install WebView2 Runtime dari:\n" +
+                    "   https://developer.microsoft.com/microsoft-edge/webview2/\n" +
+                    "2. Restart aplikasi sebagai Administrator\n" +
+                    "3. Cek antivirus/security software settings\n" +
+                    "4. Restart komputer setelah install WebView2 Runtime\n\n" +
+                    $"Log file: {logPath}",
+                    "WebView2 Access Denied",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error initializing WebView2: {ex.Message}\n\nPastikan WebView2 Runtime sudah terinstall.\n\nDownload dari: https://developer.microsoft.com/microsoft-edge/webview2/", 
-                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                string errorDetails = $"Error initializing WebView2: {ex.Message}\r\nStack trace: {ex.StackTrace}";
+                LogToFile($"ERROR: {errorDetails}");
+                
+                string logPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "DXN_POS_Printer",
+                    "Logs",
+                    $"webview2_{DateTime.Now:yyyyMMdd}.log");
+                
+                string errorMessage = $"Error initializing WebView2: {ex.Message}\n\n";
+                
+                // Check specific error types
+                if (ex.Message.Contains("access", StringComparison.OrdinalIgnoreCase) || 
+                    ex.Message.Contains("denied", StringComparison.OrdinalIgnoreCase) || 
+                    ex.Message.Contains("permission", StringComparison.OrdinalIgnoreCase))
+                {
+                    errorMessage += "Access Denied Error:\n";
+                    errorMessage += "1. Pastikan WebView2 Runtime sudah terinstall\n";
+                    errorMessage += "2. Coba jalankan aplikasi sebagai Administrator\n";
+                    errorMessage += "3. Cek antivirus/security software settings\n";
+                }
+                else
+                {
+                    errorMessage += "Pastikan WebView2 Runtime sudah terinstall.\n";
+                }
+                
+                errorMessage += "\nDownload WebView2 Runtime dari:\n";
+                errorMessage += "https://developer.microsoft.com/microsoft-edge/webview2/\n\n";
+                errorMessage += $"Log file: {logPath}";
+                
+                MessageBox.Show(
+                    errorMessage,
+                    "WebView2 Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
         }
 
@@ -1074,52 +1287,59 @@ namespace PosPrinterApp
 
         private async void BtnZoomIn_Click(object sender, EventArgs e)
         {
+            // Zoom manual dinonaktifkan - zoom tetap berdasarkan ukuran layar
+            // Method ini tetap ada untuk kompatibilitas tapi tidak mengubah zoom
             try
             {
                 if (_webView?.CoreWebView2 != null)
                 {
-                    _currentZoomFactor = Math.Min(_currentZoomFactor + 0.1, 3.0); // Max 300%
-                    await SetZoomLevel(_currentZoomFactor);
+                    // Kembalikan ke zoom tetap
+                    await SetFixedZoomLevel(_currentZoomFactor);
                     UpdateZoomLabel();
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error zoom in: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                System.Diagnostics.Debug.WriteLine($"Error in zoom in: {ex.Message}");
             }
         }
 
         private async void BtnZoomOut_Click(object sender, EventArgs e)
         {
+            // Zoom manual dinonaktifkan - zoom tetap berdasarkan ukuran layar
+            // Method ini tetap ada untuk kompatibilitas tapi tidak mengubah zoom
             try
             {
                 if (_webView?.CoreWebView2 != null)
                 {
-                    _currentZoomFactor = Math.Max(_currentZoomFactor - 0.1, 0.25); // Min 25%
-                    await SetZoomLevel(_currentZoomFactor);
+                    // Kembalikan ke zoom tetap
+                    await SetFixedZoomLevel(_currentZoomFactor);
                     UpdateZoomLabel();
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error zoom out: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                System.Diagnostics.Debug.WriteLine($"Error in zoom out: {ex.Message}");
             }
         }
 
         private async void BtnZoomReset_Click(object sender, EventArgs e)
         {
+            // Reset ke zoom tetap berdasarkan DPI
             try
             {
                 if (_webView?.CoreWebView2 != null)
                 {
-                    _currentZoomFactor = 1.0; // Reset to 100%
-                    await SetZoomLevel(_currentZoomFactor);
+                    // Kembalikan ke zoom tetap berdasarkan DPI
+                    double baseZoom = 1.0 / Math.Max(_dpiScaleX, _dpiScaleY);
+                    _currentZoomFactor = Math.Max(0.5, Math.Min(baseZoom, 2.0));
+                    await SetFixedZoomLevel(_currentZoomFactor);
                     UpdateZoomLabel();
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error reset zoom: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                System.Diagnostics.Debug.WriteLine($"Error reset zoom: {ex.Message}");
             }
         }
 
@@ -1129,20 +1349,28 @@ namespace PosPrinterApp
             {
                 if (_webView?.CoreWebView2 != null)
                 {
-                    // Gunakan JavaScript untuk zoom dengan style yang konsisten
+                    // Gunakan style dengan ID khusus untuk zoom tetap
                     string script = $@"
                         (function() {{
-                            var zoomStyle = document.getElementById(""pos-printer-zoom-auto"");
+                            // Hapus zoom style yang lama (jika ada)
+                            var oldZoomStyle = document.getElementById(""pos-printer-zoom-auto"");
+                            if (oldZoomStyle) {{
+                                oldZoomStyle.remove();
+                            }}
+                            
+                            // Buat atau update zoom style tetap
+                            var zoomStyle = document.getElementById(""pos-printer-zoom-fixed"");
                             if (!zoomStyle) {{
                                 zoomStyle = document.createElement(""style"");
-                                zoomStyle.id = ""pos-printer-zoom-auto"";
+                                zoomStyle.id = ""pos-printer-zoom-fixed"";
                                 document.head.appendChild(zoomStyle);
                             }}
                             
                             var scale = {zoomFactor.ToString(System.Globalization.CultureInfo.InvariantCulture)};
                             var widthPercent = (100 / scale);
                             
-                            zoomStyle.textContent = ""html, body {{ transform: scale("" + scale + ""); transform-origin: top left; width: "" + widthPercent + ""% !important; min-width: "" + widthPercent + ""% !important; }}"";
+                            // Apply zoom dengan !important untuk mencegah perubahan
+                            zoomStyle.textContent = ""html, body {{ transform: scale("" + scale + "") !important; transform-origin: top left !important; width: "" + widthPercent + ""% !important; }} "";
                             
                             // Update viewport height
                             var viewportHeight = (window.innerHeight || document.documentElement.clientHeight) / scale;
@@ -1156,6 +1384,53 @@ namespace PosPrinterApp
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error setting zoom: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Set zoom level yang tetap (tidak berubah-ubah) berdasarkan ukuran layar dan DPI
+        /// </summary>
+        private async Task SetFixedZoomLevel(double zoomFactor)
+        {
+            try
+            {
+                if (_webView?.CoreWebView2 != null)
+                {
+                    // Gunakan style dengan ID khusus untuk zoom tetap
+                    string script = $@"
+                        (function() {{
+                            // Hapus zoom style yang lama (jika ada)
+                            var oldZoomStyle = document.getElementById(""pos-printer-zoom-auto"");
+                            if (oldZoomStyle) {{
+                                oldZoomStyle.remove();
+                            }}
+                            
+                            // Buat atau update zoom style tetap
+                            var zoomStyle = document.getElementById(""pos-printer-zoom-fixed"");
+                            if (!zoomStyle) {{
+                                zoomStyle = document.createElement(""style"");
+                                zoomStyle.id = ""pos-printer-zoom-fixed"";
+                                document.head.appendChild(zoomStyle);
+                            }}
+                            
+                            var scale = {zoomFactor.ToString(System.Globalization.CultureInfo.InvariantCulture)};
+                            var widthPercent = (100 / scale);
+                            
+                            // Apply zoom dengan !important untuk mencegah perubahan
+                            zoomStyle.textContent = ""html, body {{ transform: scale("" + scale + "") !important; transform-origin: top left !important; width: "" + widthPercent + ""% !important; }} "";
+                            
+                            // Update viewport height
+                            var viewportHeight = (window.innerHeight || document.documentElement.clientHeight) / scale;
+                            document.documentElement.style.height = viewportHeight + ""px"";
+                            document.body.style.height = ""auto"";
+                        }})();
+                    ";
+                    await _webView.CoreWebView2.ExecuteScriptAsync(script);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error setting fixed zoom: {ex.Message}");
             }
         }
 
@@ -1178,22 +1453,23 @@ namespace PosPrinterApp
                     int adjustedHeight = (int)(_webView.Height / _dpiScaleY);
                     
                     // Trigger auto-fit JavaScript dengan adjusted WebView dimensions
+                    // Zoom tetap, hanya adjust fit
                     string fitScript = $@"
                         (function() {{
                             var autoFit = window.posPrinterAutoFit;
                             if (autoFit) {{
                                 autoFit({adjustedWidth}, {adjustedHeight});
-                                
-                                // Get current scale untuk update label
-                                var zoomStyle = document.getElementById(""pos-printer-zoom-auto"");
-                                if (zoomStyle && zoomStyle.textContent) {{
-                                    var match = zoomStyle.textContent.match(/scale\(([0-9.]+)\)/);
-                                    if (match && match[1]) {{
-                                        return parseFloat(match[1]);
-                                    }}
-                                }}
                             }}
-                            return 1.0;
+                            
+                            // Pastikan zoom tetap tidak berubah
+                            var zoomStyle = document.getElementById(""pos-printer-zoom-fixed"");
+                            if (zoomStyle) {{
+                                var scale = {_currentZoomFactor.ToString(System.Globalization.CultureInfo.InvariantCulture)};
+                                var widthPercent = (100 / scale);
+                                zoomStyle.textContent = ""html, body {{ transform: scale("" + scale + "") !important; transform-origin: top left !important; width: "" + widthPercent + ""% !important; }} "";
+                            }}
+                            
+                            return {_currentZoomFactor.ToString(System.Globalization.CultureInfo.InvariantCulture)};
                         }})();
                     ";
                     
@@ -1202,14 +1478,14 @@ namespace PosPrinterApp
                     scaleResult = scaleResult.Trim('"');
                     if (double.TryParse(scaleResult, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double scale))
                     {
-                        _currentZoomFactor = scale;
+                        // Zoom tetap, tidak update _currentZoomFactor
                         UpdateZoomLabel();
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error fit to width: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                System.Diagnostics.Debug.WriteLine($"Error fit to width: {ex.Message}");
             }
         }
 
@@ -1297,6 +1573,86 @@ namespace PosPrinterApp
             {
                 System.Diagnostics.Debug.WriteLine($"Error auto-fit: {ex.Message}");
             }
+
+            // Auto-start HTTP server saat aplikasi dibuka (default port: 7080)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(300); // beri waktu UI selesai render
+                    if (IsDisposed) return;
+
+                    if (InvokeRequired)
+                    {
+                        Invoke(new Action(async () => await AutoStartHttpServerAsync()));
+                    }
+                    else
+                    {
+                        await AutoStartHttpServerAsync();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error auto-start server: {ex.Message}");
+                }
+            });
+        }
+
+        private static bool IsTcpPortAvailable(int port)
+        {
+            try
+            {
+                var listener = new TcpListener(System.Net.IPAddress.Loopback, port);
+                listener.Start();
+                listener.Stop();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private async Task AutoStartHttpServerAsync()
+        {
+            if (_httpServerService == null || _httpServerService.IsRunning)
+                return;
+
+            int port = 7080;
+            if (_txtServerPort != null && int.TryParse(_txtServerPort.Text, out int parsed) && parsed > 0 && parsed < 65536)
+            {
+                port = parsed;
+            }
+            else if (_txtServerPort != null)
+            {
+                _txtServerPort.Text = "7080";
+            }
+
+            if (!IsTcpPortAvailable(port))
+            {
+                _lblServerStatus.Text = $"Status: Gagal auto-start (port {port} sudah digunakan)";
+                _lblServerStatus.ForeColor = Color.OrangeRed;
+                OnServerLog($"[{DateTime.Now:HH:mm:ss}] Auto-start dibatalkan: port {port} sudah digunakan");
+                return;
+            }
+
+            try
+            {
+                _httpServerService.Port = port;
+                await _httpServerService.StartAsync();
+
+                _btnServerStart.Enabled = false;
+                _btnServerStop.Enabled = true;
+                _txtServerPort.Enabled = false;
+                _lblServerStatus.Text = $"Status: Aktif di http://localhost:{port}/";
+                _lblServerStatus.ForeColor = Color.Green;
+            }
+            catch (Exception ex)
+            {
+                _lblServerStatus.Text = $"Status: Gagal auto-start ({ex.Message})";
+                _lblServerStatus.ForeColor = Color.OrangeRed;
+                OnServerLog($"[{DateTime.Now:HH:mm:ss}] Error auto-start server: {ex.Message}");
+            }
         }
         
         private async void AutoFitWebView()
@@ -1306,9 +1662,8 @@ namespace PosPrinterApp
                 // Auto-fit to width jika WebView sudah loaded
                 if (_webView?.CoreWebView2 != null)
                 {
-                    // Reset zoom dulu menggunakan method yang sudah ada
-                    _currentZoomFactor = 1.0;
-                    await SetZoomLevel(1.0);
+                    // Set zoom tetap berdasarkan DPI (tidak reset ke 1.0)
+                    await SetFixedZoomLevel(_currentZoomFactor);
                     UpdateZoomLabel();
                     
                     // Fit to width setelah delay untuk memastikan website sudah loaded

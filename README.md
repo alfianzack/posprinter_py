@@ -38,6 +38,9 @@ Aplikasi Windows Forms C# untuk mengontrol POS printer dan cash drawer menggunak
    ```bash
    dotnet publish -c Release -r win-x64 --self-contained
    ```
+
+  **build yang baru**
+  dotnet publish -c Release -r win-x64 --self-contained true -p:AssemblyName=DXNPOS -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
    
    **Cara menjalankan di komputer lain:**
    - Copy seluruh folder `publish/win-x64` ke komputer target

@@ -1,0 +1,8 @@
+{
+  "htmlContent": "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>body { font-family: 'Courier New', monospace; width: 576px; margin: 0 auto; padding: 10px; font-size: 12px; } .header { text-align: center; font-weight: bold; margin-bottom: 10px; } .separator { text-align: center; margin: 8px 0; } .item { display: flex; justify-content: space-between; margin: 5px 0; } .total { font-weight: bold; border-top: 1px solid #000; padding-top: 5px; margin-top: 10px; } .footer { text-align: center; margin-top: 20px; font-style: italic; }</style></head><body><div class=\"header\">DXN COMPANY</div><div class=\"header\">123 Main Street</div><div class=\"header\">Phone: 123-456-7890</div><div class=\"separator\">================================</div><div class=\"item\"><span>Order No:</span><span>ORD001</span></div><div class=\"item\"><span>Date:</span><span>2024-01-01 10:00:00</span></div><div class=\"separator\">--------------------------------</div><div class=\"item\"><span>Product 1</span><span>Rp 50.00</span></div><div class=\"item\"><span>Product 2</span><span>Rp 30.00</span></div><div class=\"separator\">--------------------------------</div><div class=\"total item\"><span>Total</span><span>Rp 80.00</span></div><div class=\"separator\">================================</div><div class=\"footer\">Thank you. Please come again.</div></body></html>",
+  "cutPaper": true,
+  "useExactLayout": true,
+  "width": 576,
+  "dither": true
+}
+

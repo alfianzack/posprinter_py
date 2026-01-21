@@ -23,7 +23,7 @@ echo.
 REM Build aplikasi sebagai self-contained
 echo [2/4] Building application (self-contained)...
 cd /d "%PROJECT_DIR%"
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:IncludeNativeLibrariesForSelfExtract=true -o "%PUBLISH_DIR%"
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:IncludeNativeLibrariesForSelfExtract=true -p:IncludeAllContentForSelfExtract=true -o "%PUBLISH_DIR%"
 if errorlevel 1 (
     echo ERROR: Build failed!
     pause

@@ -1,0 +1,271 @@
+{
+  "examples": {
+    "mode1_html_direct": {
+      "description": "Mode 1: Kirim HTML langsung (sistem print HTML yang sudah jadi)",
+      "endpoint": "POST http://localhost:7080/api/print-html",
+      "request": {
+        "htmlContent": "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>body { font-family: Arial; width: 576px; margin: 0 auto; padding: 10px; } .header { text-align: center; font-weight: bold; margin-bottom: 10px; } .item { display: flex; justify-content: space-between; margin: 5px 0; } .total { font-weight: bold; border-top: 1px solid #000; padding-top: 5px; margin-top: 10px; }</style></head><body><div class=\"header\">DXN COMPANY</div><div class=\"header\">123 Main Street</div><div class=\"header\">Phone: 123-456-7890</div><hr><div class=\"item\"><span>Order No:</span><span>ORD001</span></div><div class=\"item\"><span>Date:</span><span>2024-01-01 10:00:00</span></div><hr><div class=\"item\"><span>Product 1</span><span>Rp 50.00</span></div><div class=\"item\"><span>Product 2</span><span>Rp 30.00</span></div><div class=\"total item\"><span>Total</span><span>Rp 80.00</span></div><hr><div style=\"text-align: center; margin-top: 20px;\">Thank you!</div></body></html>",
+        "cutPaper": true,
+        "useExactLayout": true,
+        "width": 576,
+        "dither": true
+      }
+    },
+    
+    "mode2_data_simple": {
+      "description": "Mode 2: Kirim data sederhana (sistem generate HTML)",
+      "endpoint": "POST http://localhost:7080/api/print-html",
+      "request": {
+        "data": {
+          "company": {
+            "companyName": "DXN COMPANY",
+            "address": "123 Main Street, Jakarta",
+            "phone1": "123-456-7890",
+            "email": "info@dxn.com"
+          },
+          "transHead": {
+            "orderNo": "ORD001",
+            "customerName": "John Doe",
+            "cashier": "Cashier 1",
+            "createdDate": "2024-01-01 10:00:00",
+            "totalPrice": 80.00,
+            "payAmt": 100.00,
+            "change": 20.00,
+            "paymentMethod": "Cash"
+          },
+          "transDetail": [
+            {
+              "seq": 1,
+              "productName": "Product 1",
+              "qty": 2,
+              "price": 25.00,
+              "sellingDesc": "Size: Large"
+            },
+            {
+              "seq": 2,
+              "productName": "Product 2",
+              "qty": 1,
+              "price": 30.00,
+              "sellingDesc": "Size: Medium"
+            }
+          ],
+          "printSetting": {
+            "optType": "ORDER",
+            "compName": true,
+            "compAddr": true,
+            "compPhone1": true,
+            "compEmail": true,
+            "orderNo": true,
+            "custName": true,
+            "cashier": true,
+            "date": true,
+            "salesPrice": true,
+            "product": true,
+            "sellingDesc": true,
+            "paymentInfo": true,
+            "footerMsg": true
+          }
+        },
+        "cutPaper": true,
+        "useExactLayout": true,
+        "width": 576,
+        "dither": true
+      }
+    },
+    
+    "mode2_data_complete": {
+      "description": "Mode 2: Kirim data lengkap dengan semua field",
+      "endpoint": "POST http://localhost:7080/api/print-html",
+      "request": {
+        "data": {
+          "company": {
+            "companyId": "COMP001",
+            "companyName": "DXN COMPANY SDN BHD",
+            "regNo": "REG123456",
+            "address": "123 Main Street, Jakarta 12345",
+            "phone1": "123-456-7890",
+            "email": "info@dxn.com",
+            "contactPerson": "John Manager",
+            "taxRegistrant": true,
+            "serviceCharge": true
+          },
+          "transHead": {
+            "orderNo": "ORD20240101001",
+            "invoiceNo": "INV20240101001",
+            "receiptNo": "RCP20240101001",
+            "customerType": "CT240001",
+            "customerTypeName": "Member",
+            "customerId": "CUST001",
+            "customerName": "John Doe",
+            "serviceType": "ST001",
+            "serviceTypeName": "Dine In",
+            "salesType": "SALES001",
+            "salesTypeName": "Retail",
+            "tableNo": "T01",
+            "cashier": "Cashier 1",
+            "createdDate": "2024-01-01 10:30:00",
+            "totalPrice": 150.50,
+            "subtotalPrice": 140.00,
+            "totalTax": 10.00,
+            "serviceCharge": 5.00,
+            "delvCharge": 10.00,
+            "processingFee": 2.50,
+            "totalSpecDisc": 5.00,
+            "totalVoucher": 0.00,
+            "rndPay": 0.00,
+            "payAmt": 200.00,
+            "change": 49.50,
+            "totalPv": 15.0,
+            "totalSv": 5.0,
+            "paidStatus": "1",
+            "stampDuty": 0.00,
+            "paymentMethod": "Cash",
+            "referenceNo": "REF001"
+          },
+          "transDetail": [
+            {
+              "rowId": 1,
+              "seq": 1,
+              "prodCode": "PROD001",
+              "productName": "Product A",
+              "qty": 2,
+              "price": 50.00,
+              "promoAmt": 0.00,
+              "sellingDesc": "Size: Large, Color: Red"
+            },
+            {
+              "rowId": 2,
+              "seq": 1,
+              "prodCode": "PROD001",
+              "productName": "Product A",
+              "qty": 1,
+              "price": 50.00,
+              "promoAmt": 5.00,
+              "sellingDesc": "Size: Medium, Color: Blue (Promo)"
+            },
+            {
+              "rowId": 3,
+              "seq": 2,
+              "prodCode": "PROD002",
+              "productName": "Product B",
+              "qty": 1,
+              "price": 40.00,
+              "promoAmt": 0.00,
+              "sellingDesc": "Size: Small"
+            }
+          ],
+          "printSetting": {
+            "optType": "RECEIPT",
+            "compName": true,
+            "compRegno": true,
+            "compAddr": true,
+            "compPhone1": true,
+            "compEmail": true,
+            "compPic": true,
+            "queueNo": true,
+            "custType": true,
+            "custId": true,
+            "custName": true,
+            "salesType": true,
+            "serviceType": true,
+            "tableNo": true,
+            "orderNo": true,
+            "invoiceNo": true,
+            "receiptNo": true,
+            "cashier": true,
+            "date": true,
+            "salesPrice": true,
+            "product": true,
+            "sellingDesc": true,
+            "paymentInfo": true,
+            "pvInfo": true,
+            "svInfo": true,
+            "footerMsg": true
+          }
+        },
+        "cutPaper": true,
+        "useExactLayout": true,
+        "width": 576,
+        "dither": true
+      }
+    },
+    
+    "mode2_data_minimal": {
+      "description": "Mode 2: Data minimal (hanya field penting)",
+      "endpoint": "POST http://localhost:7080/api/print-html",
+      "request": {
+        "data": {
+          "company": {
+            "companyName": "DXN COMPANY"
+          },
+          "transHead": {
+            "orderNo": "ORD001",
+            "totalPrice": 100.00,
+            "createdDate": "2024-01-01 10:00:00"
+          },
+          "transDetail": [
+            {
+              "productName": "Product 1",
+              "qty": 1,
+              "price": 100.00
+            }
+          ],
+          "printSetting": {
+            "compName": true,
+            "orderNo": true,
+            "salesPrice": true,
+            "product": true
+          }
+        },
+        "cutPaper": true,
+        "useExactLayout": true
+      }
+    },
+    
+    "mode2_plain_text": {
+      "description": "Mode 2: Generate HTML tapi print sebagai plain text (bukan exact layout)",
+      "endpoint": "POST http://localhost:7080/api/print-html",
+      "request": {
+        "data": {
+          "company": {
+            "companyName": "DXN COMPANY",
+            "address": "123 Main Street"
+          },
+          "transHead": {
+            "orderNo": "ORD001",
+            "totalPrice": 100.00
+          },
+          "transDetail": [
+            {
+              "productName": "Product 1",
+              "qty": 1,
+              "price": 100.00
+            }
+          ],
+          "printSetting": {
+            "compName": true,
+            "compAddr": true,
+            "orderNo": true,
+            "salesPrice": true,
+            "product": true
+          }
+        },
+        "cutPaper": true,
+        "useExactLayout": false
+      }
+    }
+  },
+  
+  "notes": {
+    "mode1": "Gunakan 'htmlContent' untuk kirim HTML langsung. Sistem akan print HTML yang sudah jadi.",
+    "mode2": "Gunakan 'data' untuk kirim data. Sistem akan generate HTML dari data tersebut.",
+    "parameters": {
+      "cutPaper": "true = potong kertas setelah print, false = tidak potong (default: true)",
+      "useExactLayout": "true = print dengan exact layout (sebagai gambar), false = print sebagai plain text (default: true)",
+      "width": "Lebar bitmap dalam pixels untuk exact layout (default: 576 untuk printer 80mm)",
+      "dither": "true = gunakan dithering untuk grayscale, false = tidak (default: true)"
+    },
+    "printSetting": "Field boolean di printSetting menentukan field mana yang akan ditampilkan. true = tampilkan, false/null = tidak tampilkan"
+  }
+}
+

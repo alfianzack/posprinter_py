@@ -1,38 +1,228 @@
-# Panduan Print HTML Content via API `/api/print`
-
-Dokumen ini menjelaskan cara menggunakan endpoint `/api/print` untuk mencetak HTML content ke POS printer.
+# API Print HTML - Panduan Lengkap
 
 ## Endpoint
+```
+POST http://localhost:7080/api/print-html
+Content-Type: application/json
+```
 
-**URL:** `http://localhost:8080/api/print`  
-**Method:** `POST`  
-**Content-Type:** `application/json`
+## Penggunaan
 
-## Request Format
+**Endpoint ini sekarang menggunakan ESC/POS library untuk print dengan format kaya (bold, font size, line).**
 
+Client hanya perlu mengirim **data saja** (tidak perlu HTML). Sistem akan:
+1. Menerima data dari client
+2. Convert data ke format ReceiptContent
+3. Print menggunakan EscPosPrinterService dengan format kaya (bold, font size, line)
+
+---
+
+## Kirim Data (Print dengan ESC/POS)
+
+### Request Body
 ```json
 {
-  "content": "<div>HTML content di sini</div>",
+  "data": {
+    "company": { ... },
+    "transHead": { ... },
+    "transDetail": [ ... ],
+    "printSetting": { ... }
+  },
   "cutPaper": true
 }
 ```
 
-### Parameters
+### Parameter
+- **data** (required): Object data receipt (PrintReceiptDataRequest)
+- **cutPaper** (optional, default: true): Apakah kertas dipotong setelah print
 
-- **content** (string, required): HTML content yang ingin dicetak
-- **cutPaper** (boolean, optional): Apakah kertas harus dipotong setelah print. Default: `true`
+**Catatan**: Endpoint ini menggunakan ESC/POS library yang otomatis akan:
+- Print company name dengan **bold** dan **large font** (center aligned)
+- Print order info dengan **bold** untuk label
+- Draw **lines** sebagai separator
+- Print total dengan **bold** dan **large font**
+- Print footer dengan **center alignment**
 
-## Response Format
+### Struktur Data
 
+#### Company Data
 ```json
 {
-  "success": true,
-  "message": "Print berhasil"
+  "companyId": "COMP001",
+  "companyName": "DXN COMPANY",
+  "regNo": "REG123456",
+  "address": "123 Main Street",
+  "phone1": "123-456-7890",
+  "email": "info@dxn.com",
+  "contactPerson": "John Manager",
+  "taxRegistrant": true,
+  "serviceCharge": true
 }
 ```
 
-atau jika error:
+#### Transaction Head Data
+```json
+{
+  "orderNo": "ORD001",
+  "invoiceNo": "INV001",
+  "receiptNo": "RCP001",
+  "customerType": "CT240001",
+  "customerTypeName": "Member",
+  "customerId": "CUST001",
+  "customerName": "John Doe",
+  "serviceType": "ST001",
+  "serviceTypeName": "Dine In",
+  "salesType": "SALES001",
+  "salesTypeName": "Retail",
+  "tableNo": "T01",
+  "cashier": "Cashier 1",
+  "createdDate": "2024-01-01 10:00:00",
+  "totalPrice": 150.50,
+  "subtotalPrice": 140.00,
+  "totalTax": 10.00,
+  "serviceCharge": 5.00,
+  "delvCharge": 10.00,
+  "processingFee": 2.50,
+  "totalSpecDisc": 5.00,
+  "totalVoucher": 0.00,
+  "rndPay": 0.00,
+  "payAmt": 200.00,
+  "change": 49.50,
+  "totalPv": 15.0,
+  "totalSv": 5.0,
+  "paidStatus": "1",
+  "stampDuty": 0.00,
+  "paymentMethod": "Cash",
+  "referenceNo": "REF001"
+}
+```
 
+#### Transaction Detail Data (Array)
+```json
+[
+  {
+    "rowId": 1,
+    "seq": 1,
+    "prodCode": "PROD001",
+    "productName": "Product A",
+    "qty": 2,
+    "price": 50.00,
+    "promoAmt": 0.00,
+    "sellingDesc": "Size: Large, Color: Red"
+  }
+]
+```
+
+#### Print Setting Data
+```json
+{
+  "optType": "ORDER",
+  "compName": true,
+  "compRegno": true,
+  "compAddr": true,
+  "compPhone1": true,
+  "compEmail": true,
+  "compPic": true,
+  "queueNo": true,
+  "custType": true,
+  "custId": true,
+  "custName": true,
+  "salesType": true,
+  "serviceType": true,
+  "tableNo": true,
+  "orderNo": true,
+  "invoiceNo": true,
+  "receiptNo": true,
+  "cashier": true,
+  "date": true,
+  "salesPrice": true,
+  "product": true,
+  "sellingDesc": true,
+  "paymentInfo": true,
+  "pvInfo": true,
+  "svInfo": true,
+  "footerMsg": true
+}
+```
+
+**Catatan**: Field boolean di `printSetting` menentukan field mana yang akan ditampilkan:
+- `true` = tampilkan field tersebut
+- `false` atau `null` = tidak tampilkan
+
+---
+
+## Contoh Lengkap Mode 2
+
+```json
+{
+  "data": {
+    "company": {
+      "companyName": "DXN COMPANY",
+      "address": "123 Main Street, Jakarta",
+      "phone1": "123-456-7890"
+    },
+    "transHead": {
+      "orderNo": "ORD001",
+      "customerName": "John Doe",
+      "cashier": "Cashier 1",
+      "createdDate": "2024-01-01 10:00:00",
+      "totalPrice": 80.00,
+      "payAmt": 100.00,
+      "change": 20.00,
+      "paymentMethod": "Cash"
+    },
+    "transDetail": [
+      {
+        "seq": 1,
+        "productName": "Product 1",
+        "qty": 2,
+        "price": 25.00,
+        "sellingDesc": "Size: Large"
+      },
+      {
+        "seq": 2,
+        "productName": "Product 2",
+        "qty": 1,
+        "price": 30.00,
+        "sellingDesc": "Size: Medium"
+      }
+    ],
+    "printSetting": {
+      "optType": "ORDER",
+      "compName": true,
+      "compAddr": true,
+      "compPhone1": true,
+      "orderNo": true,
+      "custName": true,
+      "cashier": true,
+      "date": true,
+      "salesPrice": true,
+      "product": true,
+      "sellingDesc": true,
+      "paymentInfo": true,
+      "footerMsg": true
+    }
+  },
+  "cutPaper": true,
+  "useExactLayout": true,
+  "width": 576,
+  "dither": true
+}
+```
+
+---
+
+## Response
+
+### Success Response
+```json
+{
+  "success": true,
+  "message": "Print HTML berhasil"
+}
+```
+
+### Error Response
 ```json
 {
   "success": false,
@@ -40,274 +230,87 @@ atau jika error:
 }
 ```
 
-## Contoh Penggunaan
+---
 
-### 1. PHP
+## Tips
 
-Lihat file: `examples/api-print-html-php.php`
+1. **Gunakan Mode 1** jika Anda sudah punya HTML yang siap pakai
+2. **Gunakan Mode 2** jika Anda hanya punya data dan ingin sistem yang generate HTML
+3. **useExactLayout: true** = print dengan layout yang tepat (sebagai gambar bitmap)
+4. **useExactLayout: false** = print sebagai plain text (lebih cepat, tapi layout mungkin kurang tepat)
+5. **width: 576** = untuk printer 80mm (default)
+6. **dither: true** = hasil print lebih halus untuk grayscale
 
-```php
-<?php
-$apiUrl = 'http://localhost:8080/api/print';
-$htmlContent = '<div style="text-align: center;"><h2>TOKO CONTOH</h2><p>Test Print</p></div>';
+---
 
-$data = [
-    'content' => $htmlContent,
-    'cutPaper' => true
-];
+## Testing dengan cURL
 
-$ch = curl_init($apiUrl);
-curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-
-$response = curl_exec($ch);
-$result = json_decode($response, true);
-
-if ($result['success']) {
-    echo "Print berhasil!";
-} else {
-    echo "Print gagal: " . $result['message'];
-}
-?>
-```
-
-### 2. JavaScript (Browser/Fetch API)
-
-Lihat file: `examples/api-print-html-javascript.html`
-
-```javascript
-async function printViaApi(htmlContent, cutPaper = true) {
-    const response = await fetch('http://localhost:8080/api/print', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            content: htmlContent,
-            cutPaper: cutPaper
-        })
-    });
-    
-    const result = await response.json();
-    return result;
-}
-
-// Penggunaan
-const htmlContent = `
-<div style="text-align: center;">
-    <h2>TOKO CONTOH</h2>
-    <p>Test Print</p>
-</div>
-`;
-
-const result = await printViaApi(htmlContent, true);
-if (result.success) {
-    console.log('Print berhasil!');
-} else {
-    console.log('Print gagal:', result.message);
-}
-```
-
-### 3. cURL
-
-Lihat file: `examples/api-print-html-curl.sh`
-
+### Mode 1 (HTML Langsung)
 ```bash
-curl -X POST "http://localhost:8080/api/print" \
+curl -X POST http://localhost:7080/api/print-html \
   -H "Content-Type: application/json" \
-  -d '{
-    "content": "<div style=\"text-align: center;\"><h2>TOKO CONTOH</h2><p>Test Print</p></div>",
-    "cutPaper": true
-  }'
+  -d @api-print-html-direct-example.json
 ```
 
-### 4. Python
-
-Lihat file: `examples/api-print-html-python.py`
-
-```python
-import requests
-import json
-
-api_url = "http://localhost:8080/api/print"
-
-html_content = """
-<div style="text-align: center;">
-    <h2>TOKO CONTOH</h2>
-    <p>Test Print</p>
-</div>
-"""
-
-data = {
-    "content": html_content,
-    "cutPaper": True
-}
-
-response = requests.post(api_url, json=data, headers={"Content-Type": "application/json"})
-result = response.json()
-
-if result["success"]:
-    print("Print berhasil!")
-else:
-    print(f"Print gagal: {result['message']}")
+### Mode 2 (Generate dari Data)
+```bash
+curl -X POST http://localhost:7080/api/print-html \
+  -H "Content-Type: application/json" \
+  -d @api-print-html-simple-example.json
 ```
 
-### 5. Node.js
+---
 
-Lihat file: `examples/api-print-html-nodejs.js`
+## Testing dengan JavaScript
 
 ```javascript
-const axios = require('axios');
+// Mode 1: HTML Langsung
+fetch('http://localhost:7080/api/print-html', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    htmlContent: '<html><body><h1>Test</h1></body></html>',
+    cutPaper: true,
+    useExactLayout: true
+  })
+})
+.then(res => res.json())
+.then(data => console.log(data));
 
-async function printViaApi(htmlContent, cutPaper = true) {
-    const response = await axios.post('http://localhost:8080/api/print', {
-        content: htmlContent,
-        cutPaper: cutPaper
-    }, {
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    });
-    
-    return response.data;
-}
-
-// Penggunaan
-const htmlContent = `
-<div style="text-align: center;">
-    <h2>TOKO CONTOH</h2>
-    <p>Test Print</p>
-</div>
-`;
-
-const result = await printViaApi(htmlContent, true);
-if (result.success) {
-    console.log('Print berhasil!');
-} else {
-    console.log('Print gagal:', result.message);
-}
+// Mode 2: Generate dari Data
+fetch('http://localhost:7080/api/print-html', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    data: {
+      company: {
+        companyName: 'DXN COMPANY',
+        address: '123 Main Street'
+      },
+      transHead: {
+        orderNo: 'ORD001',
+        totalPrice: 100.00
+      },
+      transDetail: [{
+        productName: 'Product 1',
+        qty: 1,
+        price: 100.00
+      }],
+      printSetting: {
+        compName: true,
+        orderNo: true,
+        salesPrice: true,
+        product: true
+      }
+    },
+    cutPaper: true,
+    useExactLayout: true
+  })
+})
+.then(res => res.json())
+.then(data => console.log(data));
 ```
-
-## Contoh HTML Content untuk Receipt
-
-### Receipt Sederhana
-
-```html
-<div style="text-align: center;">
-    <h2 style="font-size: 18px; font-weight: bold;">TOKO CONTOH</h2>
-    <p style="font-size: 12px;">Jl. Contoh No. 123</p>
-    <p style="font-size: 12px;">Telp: 081234567890</p>
-    <hr style="border-top: 1px solid #000; margin: 10px 0;">
-    <table style="width: 100%; font-size: 12px;">
-        <tr>
-            <td>Item 1</td>
-            <td style="text-align: right;">Rp 10.000</td>
-        </tr>
-        <tr>
-            <td>Item 2</td>
-            <td style="text-align: right;">Rp 15.000</td>
-        </tr>
-    </table>
-    <hr style="border-top: 1px solid #000; margin: 10px 0;">
-    <p style="text-align: right; font-weight: bold;">Total: Rp 25.000</p>
-    <p style="text-align: center; font-weight: bold;">Terima Kasih</p>
-</div>
-```
-
-### Receipt dengan Data Dinamis
-
-```html
-<div style="text-align: center;">
-    <h2 style="font-size: 18px; font-weight: bold;">TOKO CONTOH</h2>
-    <p style="font-size: 12px;">Jl. Contoh No. 123</p>
-    <hr style="border-top: 1px solid #000; margin: 10px 0;">
-    <p style="font-size: 12px;"><strong>Order No:</strong> ORD-20240101120000</p>
-    <p style="font-size: 12px;"><strong>Tanggal:</strong> 01/01/2024 12:00:00</p>
-    <hr style="border-top: 1px solid #000; margin: 10px 0;">
-    <table style="width: 100%; font-size: 12px;">
-        <tr>
-            <td>Produk A x2</td>
-            <td style="text-align: right;">Rp 20.000</td>
-        </tr>
-        <tr>
-            <td>Produk B x1</td>
-            <td style="text-align: right;">Rp 15.000</td>
-        </tr>
-    </table>
-    <hr style="border-top: 1px solid #000; margin: 10px 0;">
-    <p style="text-align: right; font-weight: bold;">Total: Rp 35.000</p>
-    <p style="text-align: center; font-weight: bold;">Terima Kasih</p>
-</div>
-```
-
-## Tips Format HTML untuk Print
-
-1. **Gunakan Inline Styles**: POS printer akan mengekstrak teks dari HTML, jadi gunakan inline styles untuk hasil terbaik.
-
-2. **Gunakan Tabel untuk Alignment**: Untuk alignment yang konsisten, gunakan tabel:
-   ```html
-   <table style="width: 100%;">
-       <tr>
-           <td>Item</td>
-           <td style="text-align: right;">Rp 10.000</td>
-       </tr>
-   </table>
-   ```
-
-3. **Gunakan `<hr>` atau Border untuk Garis Pemisah**:
-   ```html
-   <hr style="border-top: 1px solid #000; margin: 10px 0;">
-   ```
-
-4. **Hindari CSS Kompleks**: POS printer menggunakan plain text, jadi format HTML kompleks mungkin tidak terkonversi dengan sempurna.
-
-5. **Gunakan Font Size yang Sesuai**:
-   ```html
-   <div style="font-size: 12px;">Teks normal</div>
-   <div style="font-size: 14px; font-weight: bold;">Teks besar dan tebal</div>
-   ```
-
-## Catatan Penting
-
-1. **HTML akan dikonversi ke Plain Text**: Endpoint ini menerima HTML, tapi akan dikonversi ke plain text oleh printer service. Format HTML kompleks mungkin tidak terkonversi dengan sempurna.
-
-2. **Escape Karakter Khusus**: Saat mengirim HTML dalam JSON, pastikan untuk escape karakter khusus seperti `"`, `\`, dll.
-
-3. **CORS**: Endpoint mendukung CORS, jadi bisa dipanggil dari browser atau server lain.
-
-4. **Error Handling**: Selalu cek response `success` untuk mengetahui apakah print berhasil atau tidak.
-
-5. **Timeout**: Set timeout yang sesuai untuk request (default: 10 detik).
-
-## Troubleshooting
-
-### Print tidak bekerja
-
-1. **Pastikan aplikasi DXN POS Printer sedang berjalan**
-2. **Pastikan HTTP Server sudah di-start** (default port: 8080)
-3. **Cek URL API** - pastikan port sesuai dengan yang dikonfigurasi
-4. **Cek printer sudah dipilih** di aplikasi
-
-### Error: Connection refused
-
-- Pastikan aplikasi DXN POS Printer sedang berjalan
-- Pastikan HTTP Server sudah di-start
-- Cek firewall tidak memblokir port 8080
-
-### Format print tidak sesuai
-
-- HTML akan dikonversi ke plain text
-- Gunakan struktur HTML sederhana
-- Hindari CSS kompleks
-- Gunakan tabel untuk alignment
-
-## File Contoh
-
-- `examples/api-print-html-php.php` - Contoh PHP lengkap
-- `examples/api-print-html-javascript.html` - Contoh JavaScript/Browser
-- `examples/api-print-html-curl.sh` - Contoh cURL/Bash
-- `examples/api-print-html-python.py` - Contoh Python
-- `examples/api-print-html-nodejs.js` - Contoh Node.js
-

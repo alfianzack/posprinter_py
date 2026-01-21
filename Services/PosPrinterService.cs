@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Printing;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using PosPrinterApp.Resources;
 using PosPrinterApp.Models;
@@ -192,6 +193,73 @@ namespace PosPrinterApp.Services
         }
 
         /// <summary>
+        /// Print HTML content dengan layout yang tepat (exact layout)
+        /// HTML akan di-render ke bitmap menggunakan WebView2, lalu dicetak sebagai gambar ke printer ESC/POS
+        /// </summary>
+        /// <param name="htmlContent">Konten HTML yang akan dicetak</param>
+        /// <param name="cutPaper">Apakah kertas harus dipotong setelah print</param>
+        /// <param name="width">Lebar bitmap dalam pixels (default: 576 untuk 80mm printer)</param>
+        /// <param name="dither">Apakah menggunakan dithering untuk grayscale (default: true)</param>
+        /// <returns>True jika berhasil, False jika gagal</returns>
+        public bool PrintHtmlExact(string htmlContent, bool cutPaper = true, int width = 576, bool dither = true)
+        {
+            try
+            {
+                // Render HTML ke bitmap
+                Task<Bitmap> renderTask = HtmlRendererHelper.RenderHtmlToBitmapAutoSizeAsync(htmlContent, width);
+                renderTask.Wait();
+                Bitmap bitmap = renderTask.Result;
+
+                if (bitmap == null)
+                {
+                    throw new Exception("Gagal render HTML ke bitmap");
+                }
+
+                try
+                {
+                    // Konversi bitmap ke ESC/POS commands
+                    string escPosCommands = BitmapPrinterHelper.ConvertBitmapToEscPos(bitmap, dither);
+                    
+                    // ESC/POS commands
+                    var sb = new StringBuilder();
+                    
+                    // Initialize printer
+                    sb.Append((char)27); // ESC
+                    sb.Append("@");      // Initialize printer
+                    
+                    // Add bitmap printing commands
+                    sb.Append(escPosCommands);
+                    
+                    // Line feed
+                    sb.Append((char)10);
+                    sb.Append((char)10);
+                    
+                    // Cut paper if requested
+                    if (cutPaper)
+                    {
+                        sb.Append((char)29); // GS
+                        sb.Append("V");      // Cut paper
+                        sb.Append((char)66); // Full cut
+                        sb.Append((char)0);
+                    }
+                    
+                    // Print using RawPrinterHelper
+                    return RawPrinterHelper.SendStringToPrinter(_printerName, sb.ToString());
+                }
+                finally
+                {
+                    // Cleanup bitmap
+                    bitmap.Dispose();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error printing HTML exact: {ex.Message}", "Print Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Convert HTML content ke plain text untuk printer ESC/POS
         /// </summary>
         /// <param name="html">HTML content</param>
@@ -302,12 +370,27 @@ namespace PosPrinterApp.Services
                     return new string(character, lineWidth);
                 }
                 
+                // Helper function untuk ESC/POS bold commands
+                string SetBold(bool enable)
+                {
+                    return $"{(char)27}E{(char)(enable ? 1 : 0)}";
+                }
+                
+                // Helper function untuk ESC/POS font size commands
+                // size: 0 = 1x1, 16 = 2x1, 17 = 2x2
+                string SetFontSize(int size)
+                {
+                    return $"{(char)29}!{(char)size}";
+                }
+                
                 // Company Info
                 if (data.Company != null)
                 {
                     if (data.PrintSetting?.CompName == true && !string.IsNullOrEmpty(data.Company.CompanyName))
                     {
+                        receipt.Append(SetBold(true));
                         receipt.AppendLine(CenterText(data.Company.CompanyName));
+                        receipt.Append(SetBold(false));
                     }
                     if (data.PrintSetting?.CompRegno == true && !string.IsNullOrEmpty(data.Company.RegNo))
                     {
@@ -333,21 +416,27 @@ namespace PosPrinterApp.Services
                 
                 receipt.AppendLine(SeparatorLine('='));
                 
-                // Queue No (large, center, bold)
+                // Queue No (font size 2x2 and bold, center)
                 if (data.PrintSetting?.QueueNo == true && data.TransHead != null && !string.IsNullOrEmpty(data.TransHead.OrderNo))
                 {
                     string queueNo = data.TransHead.OrderNo.Length > 6 
                         ? data.TransHead.OrderNo.Substring(6) 
                         : data.TransHead.OrderNo;
+                    receipt.Append(SetBold(true));
+                    receipt.Append(SetFontSize(17)); // 2x2 (0x11 = 17)
                     receipt.AppendLine(CenterText(queueNo));
+                    receipt.Append(SetFontSize(0)); // Reset to 1x1
+                    receipt.Append(SetBold(false));
                 }
                 
                 receipt.AppendLine(SeparatorLine('='));
                 
-                // Document Type (ORDER/RECEIPT/INVOICE)
+                // Document Type (ORDER/RECEIPT/INVOICE) - bold
                 if (data.PrintSetting?.OptType != null)
                 {
+                    receipt.Append(SetBold(true));
                     receipt.AppendLine(CenterText(data.PrintSetting.OptType.ToUpper()));
+                    receipt.Append(SetBold(false));
                 }
                 
                 receipt.AppendLine(SeparatorLine('-'));
@@ -519,7 +608,11 @@ namespace PosPrinterApp.Services
                         if (hasCharges && data.TransHead.TotalPrice.HasValue)
                         {
                             receipt.AppendLine(SeparatorLine('='));
+                            receipt.Append(SetBold(true));
+                            receipt.Append(SetFontSize(17)); // 2x2 (0x11 = 17)
                             receipt.AppendLine(FormatLine("Grand Total", data.TransHead.TotalPrice.Value.ToString("F2")));
+                            receipt.Append(SetFontSize(0)); // Reset to 1x1
+                            receipt.Append(SetBold(false));
                         }
                     }
                 }

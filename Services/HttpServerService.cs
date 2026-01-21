@@ -15,13 +15,25 @@ namespace PosPrinterApp.Services
         private bool _isRunning = false;
         private int _port = 7080;
         private PosPrinterService _printerService;
+        private EscPosPrinterService _escPosPrinterService;
         private CashDrawerService _cashDrawerService;
         private Action<string>? _onLog;
 
         public HttpServerService(PosPrinterService printerService, CashDrawerService cashDrawerService)
         {
             _printerService = printerService;
+            // Gunakan printer yang sama dengan PosPrinterService
+            string defaultPrinter = printerService.GetDefaultPrinter();
+            _escPosPrinterService = new EscPosPrinterService(defaultPrinter);
             _cashDrawerService = cashDrawerService;
+        }
+        
+        /// <summary>
+        /// Update printer untuk EscPosPrinterService
+        /// </summary>
+        public void UpdateEscPosPrinter(string printerName)
+        {
+            _escPosPrinterService.SetPrinter(printerName);
         }
 
         public int Port
@@ -66,11 +78,12 @@ namespace PosPrinterApp.Services
 
                 Log($"Server HTTP berjalan di {url}");
                 Log("Endpoint tersedia:");
-                Log("  POST /api/print - Print receipt (plain text)");
-                Log("  POST /api/print-html - Print receipt (HTML format)");
+                Log("  POST /api/print - Print receipt (plain text) menggunakan ESC/POS");
+                Log("  POST /api/print-html - Print receipt menggunakan ESC/POS (kirim data saja)");
+                Log("  POST /api/print-html-exact - Print receipt (HTML format, exact layout)");
                 Log("  POST /api/print-receipt - Print receipt dari data structured");
                 Log("  POST /api/cashdrawer - Buka cash drawer");
-                Log("  POST /api/print-and-drawer - Print dan buka cash drawer");
+                Log("  POST /api/print-and-drawer - Print dan buka cash drawer menggunakan ESC/POS");
 
                 _ = Task.Run(async () => await ListenAsync());
             }
@@ -158,6 +171,11 @@ namespace PosPrinterApp.Services
                 else if (path == "/api/print-html" && method == "POST")
                 {
                     responseText = await HandlePrintHtmlRequestAsync(request);
+                    response.StatusCode = 200;
+                }
+                else if (path == "/api/print-html-exact" && method == "POST")
+                {
+                    responseText = await HandlePrintHtmlExactRequestAsync(request);
                     response.StatusCode = 200;
                 }
                 else if (path == "/api/print-receipt" && method == "POST")
@@ -257,7 +275,8 @@ namespace PosPrinterApp.Services
                 }
 
                 Log($"Printing content: {printRequest.Content.Substring(0, Math.Min(50, printRequest.Content.Length))}...");
-                bool success = _printerService.PrintCustomText(printRequest.Content, printRequest.CutPaper);
+                // Menggunakan EscPosPrinterService untuk print dengan ESC/POS commands
+                bool success = _escPosPrinterService.PrintReceipt(printRequest.Content, printRequest.CutPaper);
                 
                 return System.Text.Json.JsonSerializer.Serialize(new PrintResponse
                 {
@@ -285,6 +304,83 @@ namespace PosPrinterApp.Services
             }
         }
 
+        private async Task<string> HandlePrintHtmlExactRequestAsync(HttpListenerRequest request)
+        {
+            try
+            {
+                // Baca request body dengan encoding UTF-8
+                Encoding encoding = request.ContentEncoding ?? Encoding.UTF8;
+                if (encoding == null || encoding.CodePage == 0)
+                {
+                    encoding = Encoding.UTF8;
+                }
+                
+                using var reader = new StreamReader(request.InputStream, encoding);
+                string body = await reader.ReadToEndAsync();
+                
+                Log($"Print HTML Exact Request body length: {body.Length}");
+
+                // Configure JSON options untuk case-insensitive dan allow trailing commas
+                var jsonOptions = new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    AllowTrailingCommas = true
+                };
+
+                var printRequest = System.Text.Json.JsonSerializer.Deserialize<PrintHtmlExactRequest>(body, jsonOptions);
+                
+                if (printRequest == null)
+                {
+                    Log("Deserialisasi gagal - printRequest is null");
+                    return System.Text.Json.JsonSerializer.Serialize(new PrintHtmlExactResponse
+                    {
+                        Success = false,
+                        Message = "Format JSON tidak valid"
+                    });
+                }
+                
+                if (string.IsNullOrWhiteSpace(printRequest.HtmlContent))
+                {
+                    Log("HTML Content kosong atau null");
+                    return System.Text.Json.JsonSerializer.Serialize(new PrintHtmlExactResponse
+                    {
+                        Success = false,
+                        Message = "HTML Content tidak boleh kosong"
+                    });
+                }
+
+                int width = printRequest.Width ?? 576;
+                bool dither = printRequest.Dither ?? true;
+
+                Log($"Printing HTML exact content (length: {printRequest.HtmlContent.Length}, width: {width}, dither: {dither})");
+                bool success = _printerService.PrintHtmlExact(printRequest.HtmlContent, printRequest.CutPaper, width, dither);
+                
+                return System.Text.Json.JsonSerializer.Serialize(new PrintHtmlExactResponse
+                {
+                    Success = success,
+                    Message = success ? "Print HTML exact berhasil" : "Print HTML exact gagal"
+                });
+            }
+            catch (System.Text.Json.JsonException jsonEx)
+            {
+                Log($"JSON parsing error: {jsonEx.Message}");
+                return System.Text.Json.JsonSerializer.Serialize(new PrintHtmlExactResponse
+                {
+                    Success = false,
+                    Message = $"Format JSON tidak valid: {jsonEx.Message}"
+                });
+            }
+            catch (Exception ex)
+            {
+                Log($"Error: {ex.Message}\nStack: {ex.StackTrace}");
+                return System.Text.Json.JsonSerializer.Serialize(new PrintHtmlExactResponse
+                {
+                    Success = false,
+                    Message = $"Error: {ex.Message}"
+                });
+            }
+        }
+
         private async Task<string> HandlePrintHtmlRequestAsync(HttpListenerRequest request)
         {
             try
@@ -305,7 +401,8 @@ namespace PosPrinterApp.Services
                 var jsonOptions = new System.Text.Json.JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true,
-                    AllowTrailingCommas = true
+                    AllowTrailingCommas = true,
+                    NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString
                 };
 
                 var printRequest = System.Text.Json.JsonSerializer.Deserialize<PrintHtmlRequest>(body, jsonOptions);
@@ -320,23 +417,35 @@ namespace PosPrinterApp.Services
                     });
                 }
                 
-                if (string.IsNullOrWhiteSpace(printRequest.HtmlContent))
+                // Hanya terima data (PrintReceiptDataRequest)
+                if (printRequest.Data == null)
                 {
-                    Log("HTML Content kosong atau null");
+                    Log("Data tidak boleh kosong");
                     return System.Text.Json.JsonSerializer.Serialize(new PrintHtmlResponse
                     {
                         Success = false,
-                        Message = "HTML Content tidak boleh kosong"
+                        Message = "Data harus diisi (gunakan field 'data')"
                     });
                 }
 
-                Log($"Printing HTML content (length: {printRequest.HtmlContent.Length})");
-                bool success = _printerService.PrintHtml(printRequest.HtmlContent, printRequest.CutPaper);
+                // Convert PrintReceiptDataRequest ke ReceiptContent
+                Log("Converting data to ReceiptContent");
+                var receiptContent = ConvertToReceiptContent(printRequest.Data);
+                
+                // Set printer jika ada di request
+                if (!string.IsNullOrEmpty(printRequest.Data.Company?.CompanyName))
+                {
+                    // Bisa ditambahkan logic untuk set printer berdasarkan data jika perlu
+                }
+                
+                // Print menggunakan EscPosPrinterService
+                Log($"Printing receipt using ESC/POS (Order No: {receiptContent.OrderNo ?? "N/A"})");
+                bool success = _escPosPrinterService.PrintFormattedReceipt(receiptContent, printRequest.CutPaper);
                 
                 return System.Text.Json.JsonSerializer.Serialize(new PrintHtmlResponse
                 {
                     Success = success,
-                    Message = success ? "Print HTML berhasil" : "Print HTML gagal"
+                    Message = success ? "Print receipt berhasil" : "Print receipt gagal"
                 });
             }
             catch (System.Text.Json.JsonException jsonEx)
@@ -357,6 +466,120 @@ namespace PosPrinterApp.Services
                     Message = $"Error: {ex.Message}"
                 });
             }
+        }
+
+        /// <summary>
+        /// Convert PrintReceiptDataRequest ke ReceiptContent untuk EscPosPrinterService
+        /// </summary>
+        private ReceiptContent ConvertToReceiptContent(PrintReceiptDataRequest data)
+        {
+            var receipt = new ReceiptContent();
+            
+            // Company info
+            if (data.Company != null)
+            {
+                if (data.PrintSetting?.CompName == true)
+                {
+                    receipt.CompanyName = data.Company.CompanyName;
+                }
+                if (data.PrintSetting?.CompAddr == true)
+                {
+                    receipt.CompanyAddress = data.Company.Address;
+                }
+                if (data.PrintSetting?.CompPhone1 == true)
+                {
+                    receipt.CompanyPhone = data.Company.Phone1;
+                }
+            }
+            
+            // Queue No
+            if (data.PrintSetting?.QueueNo == true && data.TransHead != null && !string.IsNullOrEmpty(data.TransHead.OrderNo))
+            {
+                string queueNo = data.TransHead.OrderNo.Length > 6 
+                    ? data.TransHead.OrderNo.Substring(6) 
+                    : data.TransHead.OrderNo;
+                receipt.QueueNo = queueNo;
+            }
+            
+            // Document Type
+            if (data.PrintSetting?.OptType != null)
+            {
+                receipt.DocType = data.PrintSetting.OptType.ToUpper();
+            }
+            
+            // Transaction head
+            if (data.TransHead != null)
+            {
+                if (data.PrintSetting?.OrderNo == true)
+                {
+                    receipt.OrderNo = data.TransHead.OrderNo;
+                }
+                if (data.PrintSetting?.Date == true && !string.IsNullOrEmpty(data.TransHead.CreatedDate))
+                {
+                    if (DateTime.TryParse(data.TransHead.CreatedDate, out DateTime date))
+                    {
+                        receipt.Date = date.ToString("dd/MM/yyyy HH:mm:ss");
+                    }
+                    else
+                    {
+                        receipt.Date = data.TransHead.CreatedDate;
+                    }
+                }
+                if (data.PrintSetting?.SalesPrice == true)
+                {
+                    receipt.Total = data.TransHead.TotalPrice;
+                    
+                    // Set GrandTotal jika ada charges
+                    bool hasCharges = (data.Company?.TaxRegistrant == true) || 
+                                     (data.Company?.ServiceCharge == true) || 
+                                     (data.TransHead.TotalSpecDisc.HasValue && data.TransHead.TotalSpecDisc.Value > 0) || 
+                                     (data.TransHead.TotalVoucher.HasValue && data.TransHead.TotalVoucher.Value > 0) || 
+                                     (data.TransHead.RndPay.HasValue && data.TransHead.RndPay.Value != 0) || 
+                                     (data.TransHead.DelvCharge.HasValue && data.TransHead.DelvCharge.Value > 0) || 
+                                     (data.TransHead.ProcessingFee.HasValue && data.TransHead.ProcessingFee.Value > 0);
+                    
+                    if (hasCharges && data.TransHead.TotalPrice.HasValue)
+                    {
+                        receipt.GrandTotal = data.TransHead.TotalPrice;
+                    }
+                }
+            }
+            
+            // Transaction detail (items)
+            if (data.TransDetail != null && data.TransDetail.Count > 0)
+            {
+                receipt.Items = new List<ReceiptItem>();
+                
+                foreach (var detail in data.TransDetail)
+                {
+                    var item = new ReceiptItem();
+                    
+                    if (data.PrintSetting?.Product == true)
+                    {
+                        item.ProductName = detail.ProductName;
+                    }
+                    if (data.PrintSetting?.SellingDesc == true)
+                    {
+                        item.Description = detail.SellingDesc;
+                    }
+                    if (data.PrintSetting?.SalesPrice == true)
+                    {
+                        double itemPrice = (detail.Qty ?? 0) * ((detail.Price ?? 0) - (detail.PromoAmt ?? 0));
+                        item.Price = itemPrice;
+                    }
+                    item.Quantity = (int?)(detail.Qty ?? 0);
+                    
+                    receipt.Items.Add(item);
+                }
+            }
+            
+            // Footer
+            if (data.PrintSetting?.FooterMsg == true)
+            {
+                receipt.Footer = "Thank you. Please come again.";
+            }
+            
+            return receipt;
         }
 
         private async Task<string> HandlePrintReceiptDataRequestAsync(HttpListenerRequest request)
@@ -534,9 +757,9 @@ namespace PosPrinterApp.Services
                     });
                 }
 
-                // Print dulu
+                // Print dulu menggunakan EscPosPrinterService
                 Log($"Printing content: {printDrawerRequest.Content.Substring(0, Math.Min(50, printDrawerRequest.Content.Length))}...");
-                bool printSuccess = _printerService.PrintCustomText(printDrawerRequest.Content, printDrawerRequest.CutPaper);
+                bool printSuccess = _escPosPrinterService.PrintReceipt(printDrawerRequest.Content, printDrawerRequest.CutPaper);
                 
                 // Delay sebelum buka drawer (default: 500ms)
                 int delay = printDrawerRequest.DrawerDelay ?? 500;

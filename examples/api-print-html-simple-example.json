@@ -1,0 +1,54 @@
+{
+  "data": {
+    "company": {
+      "companyName": "DXN COMPANY",
+      "address": "123 Main Street, Jakarta",
+      "phone1": "123-456-7890",
+      "email": "info@dxn.com"
+    },
+    "transHead": {
+      "orderNo": "ORD001",
+      "customerName": "John Doe",
+      "cashier": "Cashier 1",
+      "createdDate": "2024-01-01 10:00:00",
+      "totalPrice": 80.00,
+      "payAmt": 100.00,
+      "change": 20.00,
+      "paymentMethod": "Cash"
+    },
+    "transDetail": [
+      {
+        "seq": 1,
+        "productName": "Product 1",
+        "qty": 2,
+        "price": 25.00,
+        "sellingDesc": "Size: Large"
+      },
+      {
+        "seq": 2,
+        "productName": "Product 2",
+        "qty": 1,
+        "price": 30.00,
+        "sellingDesc": "Size: Medium"
+      }
+    ],
+    "printSetting": {
+      "optType": "ORDER",
+      "compName": true,
+      "compAddr": true,
+      "compPhone1": true,
+      "compEmail": true,
+      "orderNo": true,
+      "custName": true,
+      "cashier": true,
+      "date": true,
+      "salesPrice": true,
+      "product": true,
+      "sellingDesc": true,
+      "paymentInfo": true,
+      "footerMsg": true
+    }
+  },
+  "cutPaper": true
+}
+
