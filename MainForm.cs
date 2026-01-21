@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Printing;
 using System.IO;
@@ -9,6 +10,7 @@ using System.Windows.Forms;
 using Microsoft.Web.WebView2.WinForms;
 using Microsoft.Web.WebView2.Core;
 using PosPrinterApp.Services;
+using PosPrinterApp.Models;
 
 namespace PosPrinterApp
 {
@@ -17,6 +19,7 @@ namespace PosPrinterApp
         private PosPrinterService _printerService;
         private CashDrawerService _cashDrawerService;
         private HttpServerService _httpServerService;
+        private JobPollerService? _jobPollerService;
         private ComboBox _printerComboBox;
         private TextBox _customTextTextBox;
         private Button _btnPrintTest;
@@ -33,7 +36,18 @@ namespace PosPrinterApp
         private Button _btnServerStop;
         private Label _lblServerStatus;
         private TextBox _txtServerLog;
+        private GroupBox _grpPolling;
+        private TextBox _txtApiKey;
+        private TextBox _txtBaseUrl;
+        private Button _btnFetchSettings;
+        private ComboBox _cmbCompany;
+        private ComboBox _cmbUser;
+        private Button _btnStartPolling;
+        private Button _btnStopPolling;
+        private Label _lblPollingStatus;
+        private Dictionary<string, List<string>> _companyUsers = new Dictionary<string, List<string>>();
         private TabControl _tabControl;
+        private string _sessionCookie = ""; // PHPSESSID dari WebView setelah login
         private TabPage _tabPrinter;
         private TabPage _tabWebView;
         private WebView2 _webView;
@@ -553,6 +567,154 @@ namespace PosPrinterApp
                 ForeColor = Color.LimeGreen
             };
             _grpServer.Controls.Add(_txtServerLog);
+
+            // GroupBox Polling
+            _grpPolling = new GroupBox
+            {
+                Text = "Auto Print Polling",
+                Location = new Point(5, 445),
+                Size = new Size(300, 200),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+            };
+            _tabPrinter.Controls.Add(_grpPolling);
+
+            // Label Base URL
+            Label lblBaseUrl = new Label
+            {
+                Text = "Base URL:",
+                Location = new Point(5, 22),
+                Size = new Size(60, 20),
+                Font = new Font("Segoe UI", 8F)
+            };
+            _grpPolling.Controls.Add(lblBaseUrl);
+
+            // TextBox Base URL
+            _txtBaseUrl = new TextBox
+            {
+                Location = new Point(70, 20),
+                Size = new Size(220, 22),
+                Font = new Font("Segoe UI", 8F),
+                Text = "https://dxnpos-train.dxn2u.com"
+            };
+            _grpPolling.Controls.Add(_txtBaseUrl);
+
+            // Label API Key
+            Label lblApiKey = new Label
+            {
+                Text = "API Key:",
+                Location = new Point(5, 48),
+                Size = new Size(60, 20),
+                Font = new Font("Segoe UI", 8F)
+            };
+            _grpPolling.Controls.Add(lblApiKey);
+
+            // TextBox API Key
+            _txtApiKey = new TextBox
+            {
+                Location = new Point(70, 46),
+                Size = new Size(220, 22),
+                Font = new Font("Segoe UI", 8F),
+                UseSystemPasswordChar = true
+            };
+            _grpPolling.Controls.Add(_txtApiKey);
+
+            // Button Fetch Settings
+            _btnFetchSettings = new Button
+            {
+                Text = "Fetch",
+                Location = new Point(5, 72),
+                Size = new Size(70, 24),
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                BackColor = Color.FromArgb(0, 120, 215),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat
+            };
+            _btnFetchSettings.FlatAppearance.BorderSize = 0;
+            _btnFetchSettings.Click += BtnFetchSettings_Click;
+            _grpPolling.Controls.Add(_btnFetchSettings);
+
+            // Label Company
+            Label lblCompany = new Label
+            {
+                Text = "Company:",
+                Location = new Point(5, 102),
+                Size = new Size(60, 20),
+                Font = new Font("Segoe UI", 8F)
+            };
+            _grpPolling.Controls.Add(lblCompany);
+
+            // ComboBox Company
+            _cmbCompany = new ComboBox
+            {
+                Location = new Point(70, 100),
+                Size = new Size(220, 22),
+                Font = new Font("Segoe UI", 8F),
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            _cmbCompany.SelectedIndexChanged += CmbCompany_SelectedIndexChanged;
+            _grpPolling.Controls.Add(_cmbCompany);
+
+            // Label User
+            Label lblUser = new Label
+            {
+                Text = "User:",
+                Location = new Point(5, 128),
+                Size = new Size(60, 20),
+                Font = new Font("Segoe UI", 8F)
+            };
+            _grpPolling.Controls.Add(lblUser);
+
+            // ComboBox User
+            _cmbUser = new ComboBox
+            {
+                Location = new Point(70, 126),
+                Size = new Size(220, 22),
+                Font = new Font("Segoe UI", 8F),
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            _grpPolling.Controls.Add(_cmbUser);
+
+            // Button Start Polling
+            _btnStartPolling = new Button
+            {
+                Text = "Start Polling",
+                Location = new Point(5, 152),
+                Size = new Size(100, 24),
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                BackColor = Color.FromArgb(16, 124, 16),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat
+            };
+            _btnStartPolling.FlatAppearance.BorderSize = 0;
+            _btnStartPolling.Click += BtnStartPolling_Click;
+            _grpPolling.Controls.Add(_btnStartPolling);
+
+            // Button Stop Polling
+            _btnStopPolling = new Button
+            {
+                Text = "Stop Polling",
+                Location = new Point(110, 152),
+                Size = new Size(100, 24),
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                BackColor = Color.FromArgb(200, 0, 0),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Enabled = false
+            };
+            _btnStopPolling.FlatAppearance.BorderSize = 0;
+            _btnStopPolling.Click += BtnStopPolling_Click;
+            _grpPolling.Controls.Add(_btnStopPolling);
+
+            // Label Status
+            _lblPollingStatus = new Label
+            {
+                Text = "Status: Tidak Aktif",
+                Location = new Point(5, 180),
+                Size = new Size(290, 20),
+                Font = new Font("Segoe UI", 8F),
+                ForeColor = Color.Red
+            };
+            _grpPolling.Controls.Add(_lblPollingStatus);
         }
 
         private void InitializeWebViewTab()
@@ -730,6 +892,16 @@ namespace PosPrinterApp
                     {
                         try
                         {
+                            // Deteksi login: jika URL bukan login page, berarti sudah login
+                            string currentUrl = _webView.CoreWebView2.Source ?? "";
+                            if (!string.IsNullOrWhiteSpace(currentUrl) && 
+                                !currentUrl.Contains("/site/login") && 
+                                !currentUrl.Contains("/site/company"))
+                            {
+                                // Coba ambil cookie PHPSESSID dari WebView
+                                await CheckAndSaveSessionCookie();
+                            }
+
                             // Get WebView dimensions untuk pass ke JavaScript (actual pixel dimensions)
                             int webViewWidth = _webView.Width;
                             int webViewHeight = _webView.Height;
@@ -1596,6 +1768,36 @@ namespace PosPrinterApp
                     System.Diagnostics.Debug.WriteLine($"Error auto-start server: {ex.Message}");
                 }
             });
+
+            // Load session cookie dari file jika ada (setelah controls dibuat)
+            _sessionCookie = LoadSessionCookie();
+            if (!string.IsNullOrWhiteSpace(_sessionCookie) && _txtApiKey != null)
+            {
+                _txtApiKey.Text = _sessionCookie;
+            }
+
+            // Auto-fetch settings dan start polling jika API key ada
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(1000); // Beri waktu UI selesai render
+                    if (IsDisposed) return;
+
+                    if (InvokeRequired)
+                    {
+                        Invoke(new Action(async () => await AutoFetchAndStartPollingAsync()));
+                    }
+                    else
+                    {
+                        await AutoFetchAndStartPollingAsync();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error auto-fetch polling: {ex.Message}");
+                }
+            });
         }
 
         private static bool IsTcpPortAvailable(int port)
@@ -1823,6 +2025,552 @@ namespace PosPrinterApp
             if (_httpServerService.IsRunning)
             {
                 _httpServerService.Stop();
+            }
+            _jobPollerService?.Stop();
+            _jobPollerService?.Dispose();
+
+            // Clear dropdown company dan user saat aplikasi ditutup
+            if (_cmbCompany != null)
+            {
+                _cmbCompany.Items.Clear();
+                _cmbCompany.SelectedItem = null;
+            }
+            if (_cmbUser != null)
+            {
+                _cmbUser.Items.Clear();
+                _cmbUser.SelectedItem = null;
+            }
+            _companyUsers.Clear();
+        }
+
+        private async void BtnFetchSettings_Click(object sender, EventArgs e)
+        {
+            string sessionCookie = _txtApiKey.Text.Trim();
+            string baseUrl = _txtBaseUrl.Text.Trim();
+
+            if (string.IsNullOrWhiteSpace(sessionCookie))
+            {
+                MessageBox.Show("Session cookie tidak ditemukan. Silakan login terlebih dahulu via WebView.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(baseUrl))
+            {
+                MessageBox.Show("Base URL tidak boleh kosong", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            _btnFetchSettings.Enabled = false;
+            _btnFetchSettings.Text = "Loading...";
+
+            try
+            {
+                using var http = new System.Net.Http.HttpClient();
+                http.Timeout = TimeSpan.FromSeconds(10);
+                var url = baseUrl.TrimEnd('/') + "/pos-printer-api/get-settings";
+                using var req = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, url);
+                
+                // Gunakan session cookie (bukan API key)
+                req.Headers.Add("Cookie", sessionCookie);
+
+                using var resp = await http.SendAsync(req);
+                var body = await resp.Content.ReadAsStringAsync();
+                if (!resp.IsSuccessStatusCode)
+                {
+                    MessageBox.Show($"Gagal fetch settings: HTTP {(int)resp.StatusCode}\n{body}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                using var doc = System.Text.Json.JsonDocument.Parse(body);
+                if (!doc.RootElement.TryGetProperty("success", out var successEl) || !successEl.GetBoolean())
+                {
+                    MessageBox.Show("Gagal fetch settings: API returned success=false", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                // Parse settings dan populate dropdown
+                _cmbCompany.Items.Clear();
+                _cmbUser.Items.Clear();
+                _companyUsers.Clear();
+
+                if (doc.RootElement.TryGetProperty("settings", out var settingsEl) && settingsEl.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    foreach (var comp in settingsEl.EnumerateArray())
+                    {
+                        string compId = comp.GetProperty("company_id").GetString() ?? "";
+                        _cmbCompany.Items.Add(compId);
+
+                        List<string> users = new List<string>();
+                        if (comp.TryGetProperty("users", out var usersEl) && usersEl.ValueKind == System.Text.Json.JsonValueKind.Array)
+                        {
+                            foreach (var user in usersEl.EnumerateArray())
+                            {
+                                string userId = user.GetProperty("user_id").GetString() ?? "";
+                                users.Add(userId);
+                            }
+                        }
+                        _companyUsers[compId] = users;
+                    }
+                }
+
+                if (_cmbCompany.Items.Count > 0)
+                {
+                    // Load pilihan terakhir atau pilih yang pertama
+                    string lastCompany = LoadLastCompany();
+                    if (!string.IsNullOrWhiteSpace(lastCompany) && _cmbCompany.Items.Contains(lastCompany))
+                    {
+                        _cmbCompany.SelectedItem = lastCompany;
+                        UpdateUserDropdown();
+
+                        string lastUser = LoadLastUser();
+                        if (!string.IsNullOrWhiteSpace(lastUser) && _cmbUser.Items.Contains(lastUser))
+                        {
+                            _cmbUser.SelectedItem = lastUser;
+                        }
+                    }
+                    else
+                    {
+                        _cmbCompany.SelectedIndex = 0;
+                        UpdateUserDropdown();
+                    }
+                }
+
+                MessageBox.Show($"Settings berhasil di-fetch: {_cmbCompany.Items.Count} company, {_cmbUser.Items.Count} user", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                _btnFetchSettings.Enabled = true;
+                _btnFetchSettings.Text = "Fetch";
+            }
+        }
+
+        private void UpdateUserDropdown()
+        {
+            if (_cmbCompany.SelectedItem == null) return;
+
+            string selectedCompany = _cmbCompany.SelectedItem.ToString() ?? "";
+            _cmbUser.Items.Clear();
+
+            if (_companyUsers.ContainsKey(selectedCompany))
+            {
+                foreach (var userId in _companyUsers[selectedCompany])
+                {
+                    _cmbUser.Items.Add(userId);
+                }
+                if (_cmbUser.Items.Count > 0)
+                {
+                    _cmbUser.SelectedIndex = 0;
+                }
+            }
+        }
+
+        private void CmbCompany_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            UpdateUserDropdown();
+        }
+
+        private void BtnStartPolling_Click(object sender, EventArgs e)
+        {
+            string sessionCookie = _txtApiKey.Text.Trim();
+            string baseUrl = _txtBaseUrl.Text.Trim();
+
+            if (string.IsNullOrWhiteSpace(sessionCookie))
+            {
+                MessageBox.Show("Session cookie tidak ditemukan. Silakan login terlebih dahulu via WebView.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (_cmbCompany.SelectedItem == null || _cmbUser.SelectedItem == null)
+            {
+                MessageBox.Show("Pilih Company dan User terlebih dahulu", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            string companyId = _cmbCompany.SelectedItem?.ToString() ?? "";
+            string userId = _cmbUser.SelectedItem?.ToString() ?? "";
+
+            if (string.IsNullOrWhiteSpace(companyId) || string.IsNullOrWhiteSpace(userId))
+            {
+                MessageBox.Show("Company ID atau User ID tidak valid", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Save pilihan terakhir
+            SaveLastCompany(companyId);
+            SaveLastUser(userId);
+
+            // Stop polling yang lama jika ada
+            _jobPollerService?.Stop();
+            _jobPollerService?.Dispose();
+
+                        // Buat settings baru
+                        var settings = new PosPrinterPollSettings
+                        {
+                            Enabled = true,
+                            BaseUrl = baseUrl,
+                            CompanyId = companyId,
+                            UserId = userId,
+                            ApiKey = sessionCookie, // Simpan session cookie sebagai "ApiKey" (untuk kompatibilitas)
+                            IntervalMs = 3000,
+                            MaxJobs = 5
+                        };
+
+            // Fetch settings dari API untuk update interval/max_jobs
+            _jobPollerService = new JobPollerService(settings, _printerService, _cashDrawerService, OnServerLog);
+            _ = Task.Run(async () =>
+            {
+                bool fetched = await _jobPollerService.FetchSettingsFromApiAsync();
+                if (InvokeRequired)
+                {
+                    Invoke(new Action(() =>
+                    {
+                        if (fetched)
+                        {
+                            _jobPollerService.Start();
+                            _btnStartPolling.Enabled = false;
+                            _btnStopPolling.Enabled = true;
+                            _lblPollingStatus.Text = "Status: Aktif";
+                            _lblPollingStatus.ForeColor = Color.Green;
+                        }
+                        else
+                        {
+                            MessageBox.Show("Gagal fetch settings dari API, polling tidak dimulai", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
+                    }));
+                }
+            });
+        }
+
+        private void BtnStopPolling_Click(object sender, EventArgs e)
+        {
+            _jobPollerService?.Stop();
+            _btnStartPolling.Enabled = true;
+            _btnStopPolling.Enabled = false;
+            _lblPollingStatus.Text = "Status: Tidak Aktif";
+            _lblPollingStatus.ForeColor = Color.Red;
+        }
+
+        private async Task AutoFetchAndStartPollingAsync()
+        {
+            try
+            {
+                // Cek apakah session cookie ada
+                string sessionCookie = _sessionCookie ?? _txtApiKey?.Text?.Trim() ?? "";
+                if (string.IsNullOrWhiteSpace(sessionCookie))
+                {
+                    return; // Tidak ada session cookie, skip auto-start
+                }
+
+                string baseUrl = _txtBaseUrl?.Text?.Trim() ?? "";
+                if (string.IsNullOrWhiteSpace(baseUrl))
+                {
+                    return; // Tidak ada base URL, skip auto-start
+                }
+
+                // Fetch settings dari API menggunakan session cookie
+                using var http = new System.Net.Http.HttpClient();
+                http.Timeout = TimeSpan.FromSeconds(10);
+                var url = baseUrl.TrimEnd('/') + "/pos-printer-api/get-settings";
+                using var req = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, url);
+                
+                // Gunakan session cookie (bukan API key)
+                req.Headers.Add("Cookie", sessionCookie);
+
+                using var resp = await http.SendAsync(req);
+                var body = await resp.Content.ReadAsStringAsync();
+                if (!resp.IsSuccessStatusCode)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Auto-fetch settings failed: HTTP {(int)resp.StatusCode}");
+                    return;
+                }
+
+                using var doc = System.Text.Json.JsonDocument.Parse(body);
+                if (!doc.RootElement.TryGetProperty("success", out var successEl) || !successEl.GetBoolean())
+                {
+                    System.Diagnostics.Debug.WriteLine("Auto-fetch settings failed: API returned success=false");
+                    return;
+                }
+
+                // Parse settings dan populate dropdown
+                _cmbCompany.Items.Clear();
+                _cmbUser.Items.Clear();
+                _companyUsers.Clear();
+
+                if (doc.RootElement.TryGetProperty("settings", out var settingsEl) && settingsEl.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    foreach (var comp in settingsEl.EnumerateArray())
+                    {
+                        string compId = comp.GetProperty("company_id").GetString() ?? "";
+                        _cmbCompany.Items.Add(compId);
+
+                        List<string> users = new List<string>();
+                        if (comp.TryGetProperty("users", out var usersEl) && usersEl.ValueKind == System.Text.Json.JsonValueKind.Array)
+                        {
+                            foreach (var user in usersEl.EnumerateArray())
+                            {
+                                string userId = user.GetProperty("user_id").GetString() ?? "";
+                                users.Add(userId);
+                            }
+                        }
+                        _companyUsers[compId] = users;
+                    }
+                }
+
+                if (_cmbCompany.Items.Count == 0)
+                {
+                    return; // Tidak ada company, skip auto-start
+                }
+
+                // Load pilihan terakhir atau pilih yang pertama
+                string lastCompany = LoadLastCompany();
+                string lastUser = LoadLastUser();
+
+                if (!string.IsNullOrWhiteSpace(lastCompany) && _cmbCompany.Items.Contains(lastCompany))
+                {
+                    _cmbCompany.SelectedItem = lastCompany;
+                    UpdateUserDropdown();
+
+                    if (!string.IsNullOrWhiteSpace(lastUser) && _cmbUser.Items.Contains(lastUser))
+                    {
+                        _cmbUser.SelectedItem = lastUser;
+                    }
+                }
+                else
+                {
+                    // Pilih yang pertama
+                    _cmbCompany.SelectedIndex = 0;
+                    UpdateUserDropdown();
+                }
+
+                // Auto-start polling jika company dan user sudah dipilih
+                if (_cmbCompany.SelectedItem != null && _cmbUser.SelectedItem != null)
+                {
+                    string companyId = _cmbCompany.SelectedItem.ToString() ?? "";
+                    string userId = _cmbUser.SelectedItem.ToString() ?? "";
+
+                    if (!string.IsNullOrWhiteSpace(companyId) && !string.IsNullOrWhiteSpace(userId))
+                    {
+                        // Save pilihan terakhir
+                        SaveLastCompany(companyId);
+                        SaveLastUser(userId);
+
+                        // Stop polling yang lama jika ada
+                        _jobPollerService?.Stop();
+                        _jobPollerService?.Dispose();
+
+                        // Buat settings baru
+                        var settings = new PosPrinterPollSettings
+                        {
+                            Enabled = true,
+                            BaseUrl = baseUrl,
+                            CompanyId = companyId,
+                            UserId = userId,
+                            ApiKey = sessionCookie, // Simpan session cookie sebagai "ApiKey" (untuk kompatibilitas)
+                            IntervalMs = 3000,
+                            MaxJobs = 5
+                        };
+
+                        // Fetch settings dari API untuk update interval/max_jobs
+                        _jobPollerService = new JobPollerService(settings, _printerService, _cashDrawerService, OnServerLog);
+                        bool fetched = await _jobPollerService.FetchSettingsFromApiAsync();
+                        if (fetched)
+                        {
+                            _jobPollerService.Start();
+                            _btnStartPolling.Enabled = false;
+                            _btnStopPolling.Enabled = true;
+                            _lblPollingStatus.Text = "Status: Aktif (Auto-start)";
+                            _lblPollingStatus.ForeColor = Color.Green;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error auto-fetch and start polling: {ex.Message}");
+            }
+        }
+
+        private static string LastSelectionFilePath => Path.Combine(AppContext.BaseDirectory, "posprinter_last_selection.txt");
+
+        private static void SaveLastCompany(string companyId)
+        {
+            try
+            {
+                string content = $"company={companyId}\n";
+                if (File.Exists(LastSelectionFilePath))
+                {
+                    string existing = File.ReadAllText(LastSelectionFilePath);
+                    var lines = existing.Split('\n').ToList();
+                    var newLines = new List<string> { content.Trim() };
+                    foreach (var line in lines)
+                    {
+                        if (!line.StartsWith("company=") && !string.IsNullOrWhiteSpace(line))
+                        {
+                            newLines.Add(line);
+                        }
+                    }
+                    File.WriteAllText(LastSelectionFilePath, string.Join("\n", newLines));
+                }
+                else
+                {
+                    File.WriteAllText(LastSelectionFilePath, content);
+                }
+            }
+            catch { }
+        }
+
+        private static void SaveLastUser(string userId)
+        {
+            try
+            {
+                string content = $"user={userId}\n";
+                if (File.Exists(LastSelectionFilePath))
+                {
+                    string existing = File.ReadAllText(LastSelectionFilePath);
+                    var lines = existing.Split('\n').ToList();
+                    var newLines = new List<string>();
+                    bool userFound = false;
+                    foreach (var line in lines)
+                    {
+                        if (line.StartsWith("user="))
+                        {
+                            newLines.Add(content.Trim());
+                            userFound = true;
+                        }
+                        else if (!string.IsNullOrWhiteSpace(line))
+                        {
+                            newLines.Add(line);
+                        }
+                    }
+                    if (!userFound)
+                    {
+                        newLines.Add(content.Trim());
+                    }
+                    File.WriteAllText(LastSelectionFilePath, string.Join("\n", newLines));
+                }
+                else
+                {
+                    File.WriteAllText(LastSelectionFilePath, content);
+                }
+            }
+            catch { }
+        }
+
+        private static string LoadLastCompany()
+        {
+            try
+            {
+                if (File.Exists(LastSelectionFilePath))
+                {
+                    foreach (var line in File.ReadAllLines(LastSelectionFilePath))
+                    {
+                        if (line.StartsWith("company="))
+                        {
+                            return line.Substring(8).Trim();
+                        }
+                    }
+                }
+            }
+            catch { }
+            return "";
+        }
+
+        private static string LoadLastUser()
+        {
+            try
+            {
+                if (File.Exists(LastSelectionFilePath))
+                {
+                    foreach (var line in File.ReadAllLines(LastSelectionFilePath))
+                    {
+                        if (line.StartsWith("user="))
+                        {
+                            return line.Substring(5).Trim();
+                        }
+                    }
+                }
+            }
+            catch { }
+            return "";
+        }
+
+        private static string SessionCookieFilePath => Path.Combine(AppContext.BaseDirectory, "posprinter_session_cookie.txt");
+
+        private static void SaveSessionCookie(string cookie)
+        {
+            try
+            {
+                File.WriteAllText(SessionCookieFilePath, cookie.Trim());
+            }
+            catch { }
+        }
+
+        private static string LoadSessionCookie()
+        {
+            try
+            {
+                if (File.Exists(SessionCookieFilePath))
+                {
+                    return File.ReadAllText(SessionCookieFilePath).Trim();
+                }
+            }
+            catch { }
+            return "";
+        }
+
+        private async Task CheckAndSaveSessionCookie()
+        {
+            try
+            {
+                if (_webView?.CoreWebView2?.CookieManager == null) return;
+
+                // Ambil semua cookies
+                var cookies = await _webView.CoreWebView2.CookieManager.GetCookiesAsync(_webView.CoreWebView2.Source);
+                
+                // Cari cookie PHPSESSID
+                foreach (var cookie in cookies)
+                {
+                    if (cookie.Name.Equals("PHPSESSID", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string cookieValue = $"{cookie.Name}={cookie.Value}";
+                        _sessionCookie = cookieValue;
+                        SaveSessionCookie(cookieValue);
+                        
+                        // Set txtApiKey dengan session cookie (untuk display)
+                        if (_txtApiKey != null && InvokeRequired)
+                        {
+                            Invoke(new Action(() => _txtApiKey.Text = cookieValue));
+                        }
+                        else if (_txtApiKey != null)
+                        {
+                            _txtApiKey.Text = cookieValue;
+                        }
+
+                        // Auto-fetch settings setelah login
+                        _ = Task.Run(async () =>
+                        {
+                            await Task.Delay(500); // Delay sedikit
+                            if (InvokeRequired)
+                            {
+                                Invoke(new Action(async () => await AutoFetchAndStartPollingAsync()));
+                            }
+                            else
+                            {
+                                await AutoFetchAndStartPollingAsync();
+                            }
+                        });
+
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error checking session cookie: {ex.Message}");
             }
         }
     }
