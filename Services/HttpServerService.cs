@@ -243,7 +243,6 @@ namespace PosPrinterApp.Services
                 using var reader = new StreamReader(request.InputStream, encoding);
                 string body = await reader.ReadToEndAsync();
                 
-                Log($"Request body: {body}");
 
                 // Configure JSON options untuk case-insensitive dan allow trailing commas
                 var jsonOptions = new System.Text.Json.JsonSerializerOptions
@@ -274,7 +273,6 @@ namespace PosPrinterApp.Services
                     });
                 }
 
-                Log($"Printing content: {printRequest.Content.Substring(0, Math.Min(50, printRequest.Content.Length))}...");
                 // Menggunakan EscPosPrinterService untuk print dengan ESC/POS commands
                 bool success = _escPosPrinterService.PrintReceipt(printRequest.Content, printRequest.CutPaper);
                 
@@ -318,7 +316,6 @@ namespace PosPrinterApp.Services
                 using var reader = new StreamReader(request.InputStream, encoding);
                 string body = await reader.ReadToEndAsync();
                 
-                Log($"Print HTML Exact Request body length: {body.Length}");
 
                 // Configure JSON options untuk case-insensitive dan allow trailing commas
                 var jsonOptions = new System.Text.Json.JsonSerializerOptions
@@ -352,7 +349,6 @@ namespace PosPrinterApp.Services
                 int width = printRequest.Width ?? 576;
                 bool dither = printRequest.Dither ?? true;
 
-                Log($"Printing HTML exact content (length: {printRequest.HtmlContent.Length}, width: {width}, dither: {dither})");
                 bool success = _printerService.PrintHtmlExact(printRequest.HtmlContent, printRequest.CutPaper, width, dither);
                 
                 return System.Text.Json.JsonSerializer.Serialize(new PrintHtmlExactResponse
@@ -395,7 +391,6 @@ namespace PosPrinterApp.Services
                 using var reader = new StreamReader(request.InputStream, encoding);
                 string body = await reader.ReadToEndAsync();
                 
-                Log($"Print HTML Request body length: {body.Length}");
 
                 // Configure JSON options untuk case-insensitive dan allow trailing commas
                 var jsonOptions = new System.Text.Json.JsonSerializerOptions
@@ -596,7 +591,6 @@ namespace PosPrinterApp.Services
                 using var reader = new StreamReader(request.InputStream, encoding);
                 string body = await reader.ReadToEndAsync();
                 
-                Log($"Print Receipt Data Request body length: {body.Length}");
 
                 // Configure JSON options untuk case-insensitive dan allow trailing commas
                 var jsonOptions = new System.Text.Json.JsonSerializerOptions
